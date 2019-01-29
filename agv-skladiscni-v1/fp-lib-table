@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name CD74HCT4051M96)(type Legacy)(uri D:/Programi/KiCad/CD74HCT4051M96/CD74HCT4051M96.mod)(options "")(descr ""))
+  (lib (name NLAST4051DTR2G)(type Legacy)(uri D:/Programi/KiCad/NLAST4051DTR2G/NLAST4051DTR2G.mod)(options "")(descr ""))
+)

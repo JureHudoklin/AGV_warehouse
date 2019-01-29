@@ -1,0 +1,12 @@
+Refs,Value,Footprint,Quantity,MFR,MPN,SPR,SPN
+J4,I2C,Connector_Wire:SolderWirePad_1x04_P3.175mm_Drill0.8mm,1,-,-,-,-
+J1,TOF_0,Connector_Wire:SolderWirePad_1x05_P3.175mm_Drill0.8mm,1,-,-,-,-
+J2,TOF_1,Connector_Wire:SolderWirePad_1x05_P3.175mm_Drill0.8mm,1,-,-,-,-
+J5,ADC,Connector_Wire:SolderWirePad_2x03_P3.175mm_Drill0.8mm,1,-,-,-,-
+J6,GP0,Connector_Wire:SolderWirePad_2x03_P3.175mm_Drill0.8mm,1,-,-,-,-
+J3,GP1,Connector_Wire:SolderWirePad_2x03_P3.175mm_Drill0.8mm,1,-,-,-,-
+IC1;IC2,NLAST4051DTR2G,NLAST4051DTR2G:SOP65P640X120-16N,2,,-NLAST4051DTR2G,-,-
+U3;U4;U7;U8;U11;U12;U15;U16;U1;U2;U5;U6;U9;U10;U13;U14,QRE1113GR,OptoDevice:Everlight_ITR8307F43,16,-,-QRE1113GR,-,-
+Q1;Q2,BSS138,Package_TO_SOT_SMD:SOT-23,2,-,-BSS138,-,-
+R4;R6;R10;R12;R16;R21;R26;R28;R3;R5;R9;R11;R15;R20;R25;R27;R29;R30;R17;R18;R19;R22,10K,Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder,22,-,-CRCW080510K0FKEAC,-,-
+R2;R8;R14;R24;R1;R7;R13;R23,35R,Resistor_SMD:R_0805_2012Metric_Pad1.15x1.40mm_HandSolder,8,-,-ERJ-6ENF35R7V,-,-

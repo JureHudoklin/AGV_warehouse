@@ -1,0 +1,99 @@
+
+(rules PCB agv-skladiscni-v5
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute on)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 3509)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 2.0)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 2.0)
+    )
+  )
+  (rule
+    (width 300.0)
+    (clear 250.2)
+    (clear 150.0 (type smd_to_turn_gap))
+    (clear 62.6 (type smd_smd))
+  )
+  (padstack "Via[0-1]_600:400_um"
+    (shape
+      (circle F.Cu 600.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 600.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_600:400_um" "Via[0-1]_600:400_um" default
+  )
+  (via 
+    "Via[0-1]_600:400_um-kicad_default" "Via[0-1]_600:400_um" "kicad_default"
+  )
+  (via 
+    "Via[0-1]_600:400_um-singali" "Via[0-1]_600:400_um" singali
+  )
+  (via_rule
+    default "Via[0-1]_600:400_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_600:400_um-kicad_default"
+  )
+  (via_rule
+    singali "Via[0-1]_600:400_um-singali"
+  )
+  (class default
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 300.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    GND +3V3 SCL SDA +1V8 LED0,1 LEDS LED10,11
+    "Net-(R1-Pad1)" "Net-(R2-Pad1)" "Net-(R7-Pad1)" "Net-(R8-Pad1)" "Net-(R13-Pad1)" "Net-(R14-Pad1)" "Net-(R23-Pad1)" "Net-(R24-Pad1)"
+    "Net-(U1-Pad1)" "Net-(U3-Pad1)" "Net-(U5-Pad1)" "Net-(U7-Pad1)" "Net-(U10-Pad2)" "Net-(U11-Pad1)" "Net-(U13-Pad1)" "Net-(U15-Pad1)"
+    "Net-(J3-Pad6)" "Net-(J3-Pad5)" "Net-(J5-Pad6)" "Net-(J5-Pad5)"
+    (clearance_class "kicad_default")
+    (via_rule kicad_default)
+    (rule
+      (width 300.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class singali
+    SEN1 SEN3 A0 SEN7 SEN5 "Net-(IC1-Pad6)" DIG0 DIG1
+    DIG2 SEN6 SEN0 SEN4 SEN2 SEN10 SEN12 SEN8
+    SEN14 "Net-(IC2-Pad6)" SEN13 SEN15 A1 SEN11 SEN9 "Xshut_0"
+    "Xshut_1"
+    (clearance_class singali)
+    (via_rule singali)
+    (rule
+      (width 300.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)
