@@ -1,0 +1,2 @@
+robot_control
+-DCATKIN_DEVEL_PREFIX=/home/ubuntu/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/ubuntu/catkin_ws/install -DCATKIN_WHITELIST_PACKAGES=robot_control -G Unix Makefiles
