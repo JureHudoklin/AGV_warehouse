@@ -1,0 +1,11 @@
+<launch>
+	<!--launch file -->
+	<param name="use_imu" value="0" />
+	
+	<param name="use_motors" value="0" />
+	<param name="use_tof" value="0" />
+
+	<node pkg="robot_control" type="robot_control_node" name="robot_node" output="screen">
+        <param name="use_line" value="1" />
+    </node>
+</launch>
