@@ -2,7 +2,7 @@
 
 This is a project I am currently working on. I am working on this also as a final project for my undergraduate degree (diploma). In this project I am developing and programing a robot ("robot platform") that could be used in simulation of a warehouse environment. In a simulation these robots would have to found their way around warehouse based on the input provided by the master computer. Each robot has to follow guiding lines, know his position based on ground markings, be able to autonomously charge itself, stop and report in case of obstacles and load cargo from designated stations. 
 
-<image scr="robot_v4/step_modeli/robot_picture.jpg">
+<image src="robot_v4/step_modeli/robot_picture.jpg">
 
 I already completed the robot design phase. I have designed the pcb plate as well as the whole assembly. The robot will be assembled in next few weeks when I receive all the necessary parts. This part of the project is located in ./agv-skladiscni-v1/ (KiCad files) and ./Step_modeli/ (step models of robot and pcb plate).
 
