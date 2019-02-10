@@ -6,6 +6,7 @@
 
 //Messages
 #include <std_msgs/Int32.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/MagneticField.h>
 #include <sensor_msgs/Range.h>
@@ -25,6 +26,9 @@
 #define GP1_3 3, 1
 #define GP1_4 3, 2
 
+//Publishers
+ros::Publisher line_vel_pub;
+
 
 int line_values_f[8];
 int line_values_b[8];
@@ -36,7 +40,7 @@ struct line_error {
 };
 
 void calc_line_error(line_error &arr, int* front_s, int* back_s) {
-    /*THis function calculates velocities in y direction and rotational vel z
+    /*This function calculates velocities in y direction and rotational vel z
     based on readings of 4 cetral sensors on front and back. Velocity values 
     is between -1 and 1. Sensor weight is set with parameter a.*/
     double front[2];
@@ -47,8 +51,8 @@ void calc_line_error(line_error &arr, int* front_s, int* back_s) {
     a = 0.7;
 
     for(int i = 2; i<6; i++) {
-        all_frt[i-2] = pow(front_s[i], 2);
-        all_back[i-2] = pow(back_s[i], 2);
+        all_frt[i-2] = pow(front_s[i], 1);
+        all_back[i-2] = pow(back_s[i], 1);
     }
 
     front[0] = a * (double)all_frt[1] + (1.- a) * (double)all_frt[0];
@@ -56,8 +60,8 @@ void calc_line_error(line_error &arr, int* front_s, int* back_s) {
     back[0] = a * (double)all_back[1] + (1.- a) * (double)all_back[0];
     back[1] = a * (double)all_back[2] + (1.- a) * (double)all_back[3];
 
-    arr.vel_y = (front[1]-front[0]+back[1]-back[0])/(2.*pow(2.,16.));
-    arr.vel_z = (front[1]-front[0]-back[1]+back[0])/(2.*pow(2.,16.));
+    arr.vel_y = (front[1]-front[0]+back[1]-back[0])/(2.*pow(2.,12.));
+    arr.vel_z = (front[1]-front[0]-back[1]+back[0])/(2.*pow(2.,12.));
     return;
 }
 
@@ -67,6 +71,8 @@ int main(int argc, char** argv) {
     ros::NodeHandle nh;
 
     nh.getParam("/robot_control_node/use_line", use_line);
+
+    
     ros::Rate loop_rate(50);
     
 
@@ -79,6 +85,8 @@ int main(int argc, char** argv) {
         rc_gpio_init(GP0_2, GPIOHANDLE_REQUEST_OUTPUT); //DIG_0
         rc_gpio_init(GP0_3, GPIOHANDLE_REQUEST_OUTPUT); //DIG_1
         rc_gpio_init(GP0_4, GPIOHANDLE_REQUEST_OUTPUT); //DIG_2
+
+        line_vel_pub = nh.advertise<geometry_msgs::Twist>("line_vel", 100);
     }
 
 
@@ -90,6 +98,8 @@ int main(int argc, char** argv) {
         line_error err_vel;
 
         if (use_line) {
+            geometry_msgs::Twist line_vel_msg;
+
             for(int j = 0; j<2; j++) {
                 rc_gpio_set_value(GP0_1, j);
 
@@ -102,20 +112,25 @@ int main(int argc, char** argv) {
                     rc_gpio_set_value(GP0_3, b);
                     rc_gpio_set_value(GP0_4, c);
 
-                    ros::Duration(0.00001).sleep(); //Slleps so that multiplexer has ime to settle
+                    ros::Duration(0.00001).sleep(); //Sleeps so that multiplexer has time to settle
 
                     if (j == 0) {
-                        line_values_f[i] = rc_adc_read_raw(0);
-                        line_values_b[i] = rc_adc_read_raw(1);
+                        line_values_f[i] = rc_adc_read_raw(1);
+                        line_values_b[i] = rc_adc_read_raw(0);
                     }
                     else {
-                        line_values_f[i] = rc_adc_read_raw(0)-line_values_f[i];
-                        line_values_b[i] = rc_adc_read_raw(1)-line_values_b[i];
+                        line_values_f[i] = rc_adc_read_raw(1)-line_values_f[i];
+                        line_values_b[i] = rc_adc_read_raw(0)-line_values_b[i];
                     }
                 }
             }
             rc_gpio_set_value(GP0_1, 0);
+
             calc_line_error(err_vel, line_values_f, line_values_b);
+
+            line_vel_msg.linear.y = err_vel.vel_y;
+            line_vel_msg.angular.z = err_vel.vel_z;
+            
             ROS_INFO(" %f ", err_vel.vel_y);
         }
         /*---------------------------------------------------------*/
