@@ -5,7 +5,7 @@
 	<param name="use_motors" value="0" />
 	<param name="use_tof" value="0" />
 
-	<node pkg="robot_control" type="robot_control_node" name="robot_node" output="screen">
+	<node pkg="robot_control" type="robot_control_node" name="robot__control_node" output="screen">
         <param name="use_line" value="1" />
     </node>
 </launch>

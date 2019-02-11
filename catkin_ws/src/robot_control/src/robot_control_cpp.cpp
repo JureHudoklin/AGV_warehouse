@@ -10,6 +10,7 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/MagneticField.h>
 #include <sensor_msgs/Range.h>
+#include <robot/Control.h>
 
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
@@ -28,6 +29,7 @@
 
 //Publishers
 ros::Publisher line_vel_pub;
+ros::Publisher msg_test_pub;
 
 
 int line_values_f[8];
@@ -76,7 +78,7 @@ int main(int argc, char** argv) {
     ros::Rate loop_rate(50);
     
 
-
+    msg_test_pub = nh.advertise<robot::Control>("/robot_state", 100);
     //Initialze giop and adc for line sensors
     if (use_line) {
 
@@ -96,6 +98,7 @@ int main(int argc, char** argv) {
         --------------------------------------------------------
         */
         line_error err_vel;
+        robot::Control test_msg;
 
         if (use_line) {
             geometry_msgs::Twist line_vel_msg;
@@ -134,6 +137,11 @@ int main(int argc, char** argv) {
             ROS_INFO(" %f ", err_vel.vel_y);
         }
         /*---------------------------------------------------------*/
+
+        test_msg.ID = "neki";
+        msg_test_pub.publish(test_msg);
+
+
         ros::spinOnce();
 	    loop_rate.sleep();
         
