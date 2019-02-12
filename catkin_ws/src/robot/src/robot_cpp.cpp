@@ -2,6 +2,8 @@
 // http://www-ist.massey.ac.nz/conferences/ICARA2004/files/Papers/Paper74_ICARA2004_425_428.pdf
 
 #include <ros/ros.h>
+#include <string>
+#include <vector>
 
 #include <robotcontrol.h>
 
@@ -17,45 +19,38 @@
 
 #include <std_srvs/Empty.h>
 
-struct robot_velocity_state {
+
+//Structures
+struct Robot_velocity_state {
     double v_x; //Front left
     double v_y; //Frpnt right
 	double a_z; //Back right
 };
-
-struct motor_power_state {
+struct Motor_power_state {
     double pow_1; //Front left
     double pow_2; //Frpnt right
 	double pow_3; //Back right
 	double pow_4; //Back left
 };
 
+//Classes
+
 //Publishers
 ros::Publisher pub;
 
-
-
 //Subscribers
 ros::Subscriber cmd_vel_sub; 
-ros::Subscriber robot_state_sub;
-//In cmd_vel twist messages about velocities are published
-    /*Create a Subscriber object that will call the 'callback' 
-    function each timelisten to the counter topic and will*/
            
 //Services
-/*
-List services: rosservice list
-Call service: rosservice call /my_service
-*/
 ros::ServiceServer motors_on; 
 ros::ServiceServer motors_off; 
 
 //Define used variable
 bool motor_state;
 int use_motors;
-robot_velocity_state robot_velocity;
+Robot_velocity_state robot_velocity;
 
-void vel2motor(motor_power_state &pow) {
+void vel2motor(Motor_power_state &pow) {
 	double vmesni_izracun[4];
 	double koti_koles[4] = {3.*M_PI/4., 5.*M_PI/4., 7.*M_PI/4., M_PI/4.};
 
@@ -89,35 +84,28 @@ void twist_callback(const geometry_msgs::Twist &twist) {		//Zakaj kle const. Zak
 	ROS_INFO("nove_hitrosti");
 	return;
 }
-
-void robot_state_callback(const robot::Control &test) {
-	ROS_INFO("ta message ocinto dela");
-	return;
-}
-
-
-
+//------------------------------------------------------------------------------------------------------------------//
 
 int main(int argc, char** argv) {
     
-
     //Definer and run the node
 	ros::init(argc, argv, "robot");
 	ros::NodeHandle nh;
 
+	//Set node parameters
 	nh.getParam("/robot_node/use_motors", use_motors);
 	ROS_INFO(" %d", use_motors);
 
     //Start adverstisers, subscribers and services
     //pub = nh.advertise<std_msgs::Int32>("jure_topic", 1000);
     //sub = nh.subscribe("tema_subscriptiona", 1000, counterCallback); 
-
+	
 
 	motors_on = nh.advertiseService("/motors_on", motors_on_call);
 	motors_off = nh.advertiseService("/motors_off", motors_off_call);
 
 
-	ros::Rate loop_rate(2);
+	ros::Rate loop_rate(10);
 
 
 
@@ -129,7 +117,7 @@ int main(int argc, char** argv) {
 	*/
 	if (use_motors == 1)	{
 
-		ROS_INFO("Initialize motors and encoders");
+		
 
 		cmd_vel_sub = nh.subscribe("/cmd_vel", 100, &twist_callback); 
 		if(rc_motor_init() == -1)	{
@@ -138,7 +126,6 @@ int main(int argc, char** argv) {
 		}
 		if(rc_encoder_init() == -1)	{
 			ROS_ERROR_STREAM("Encoder initialization unsucessfull");
-			return -1;
 		}
 		for(int i = 0; i<4; i++) {
 			if(rc_encoder_write(i, 0) == -1) {
@@ -147,13 +134,13 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	robot_state_sub = nh.subscribe("/robot_state", 100, &robot_state_callback);
+
 
 
 	while (ros::ok())
 	{
 		if (motor_state){
-			motor_power_state power;  //Based on v_x,v_y,a_z set power for each motor
+			Motor_power_state power;  //Based on v_x,v_y,a_z set power for each motor
 
 			vel2motor(power);
 
@@ -176,7 +163,6 @@ int main(int argc, char** argv) {
 
 	if (use_motors){
 		rc_motor_cleanup();
-		rc_encoder_cleanup();
 	}
 	return 0;
 }

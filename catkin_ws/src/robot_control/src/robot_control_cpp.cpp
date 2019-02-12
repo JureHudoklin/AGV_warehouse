@@ -29,7 +29,6 @@
 
 //Publishers
 ros::Publisher line_vel_pub;
-ros::Publisher msg_test_pub;
 
 
 int line_values_f[8];
@@ -39,31 +38,38 @@ int use_line = 1;
 struct line_error {
     double vel_y;
     double vel_z;
+    double i_err_y;
+    double i_err_z;
 };
 
 void calc_line_error(line_error &arr, int* front_s, int* back_s) {
     /*This function calculates velocities in y direction and rotational vel z
     based on readings of 4 cetral sensors on front and back. Velocity values 
     is between -1 and 1. Sensor weight is set with parameter a.*/
-    double front[2];
-    double back[2];
-    long all_frt[4];
-    long all_back[4];
-    double a;
-    a = 0.7;
+    double front[2], back[2], a, , p_err_y, p_err_z, Kp, Ki;
+    long all_frt[4], all_back[4];
+    a = 0.7; //Weight for outer and inner sensors
+    Kp = 1.; //Proportional koefficient
+    Ki = 0.3;   //Integral koefficient
 
-    for(int i = 2; i<6; i++) {
+    for(int i = 2; i<6; i++) {  //Take out inner for sensors and put the values in all_frt and all_back
         all_frt[i-2] = pow(front_s[i], 1);
         all_back[i-2] = pow(back_s[i], 1);
     }
-
+    //Sum the outer sensors 2 by 2, using weight a. Values are stored in front and back array
     front[0] = a * (double)all_frt[1] + (1.- a) * (double)all_frt[0];
     front[1] = a * (double)all_frt[2] + (1.- a) * (double)all_frt[3];
     back[0] = a * (double)all_back[1] + (1.- a) * (double)all_back[0];
     back[1] = a * (double)all_back[2] + (1.- a) * (double)all_back[3];
 
-    arr.vel_y = (front[1]-front[0]+back[1]-back[0])/(2.*pow(2.,12.));
-    arr.vel_z = (front[1]-front[0]-back[1]+back[0])/(2.*pow(2.,12.));
+    p_err_y = front[1]-front[0]+back[1]-back[0];    //Caluclate proportional err for y
+    p_err_z = front[1]-front[0]-back[1]+back[0];    //Caluclate proportional err for z
+
+    arr.i_err_y += p_err_y; //Add integral error to previous values
+    arr.i_err_z += p_err_z;
+
+    arr.vel_y = Kp*p_err_y + Ki*arr.i_err_y / pow(2.,13.)); //Calulate velocity based on errors
+    arr.vel_z = Kp*p_err_z + Ki*arr.i_err_z / pow(2.,13.)); //Scaling factor is  2**13
     return;
 }
 
@@ -88,7 +94,7 @@ int main(int argc, char** argv) {
         rc_gpio_init(GP0_3, GPIOHANDLE_REQUEST_OUTPUT); //DIG_1
         rc_gpio_init(GP0_4, GPIOHANDLE_REQUEST_OUTPUT); //DIG_2
 
-        line_vel_pub = nh.advertise<geometry_msgs::Twist>("line_vel", 100);
+        line_vel_pub = nh.advertise<robot::Control>("/robot_state", 100);
     }
 
 
@@ -98,10 +104,10 @@ int main(int argc, char** argv) {
         --------------------------------------------------------
         */
         line_error err_vel;
-        robot::Control test_msg;
+        int integral_error;
 
         if (use_line) {
-            geometry_msgs::Twist line_vel_msg;
+            robot::Control line_vel_msg;
 
             for(int j = 0; j<2; j++) {
                 rc_gpio_set_value(GP0_1, j);
@@ -131,15 +137,13 @@ int main(int argc, char** argv) {
 
             calc_line_error(err_vel, line_values_f, line_values_b);
 
-            line_vel_msg.linear.y = err_vel.vel_y;
-            line_vel_msg.angular.z = err_vel.vel_z;
-            
-            ROS_INFO(" %f ", err_vel.vel_y);
+            line_vel_msg.ID = "Line_vel";
+            line_vel_msg.state = true;
+            line_vel_msg.action = true;
+            line_vel_msg.vel = {0,err_vel.vel_y, err_vel.vel_z};
+            line_vel_pub.publish(line_vel_msg);
         }
         /*---------------------------------------------------------*/
-
-        test_msg.ID = "neki";
-        msg_test_pub.publish(test_msg);
 
 
         ros::spinOnce();
