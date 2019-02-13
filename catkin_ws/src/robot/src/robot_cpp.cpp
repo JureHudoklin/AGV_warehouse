@@ -33,8 +33,6 @@ struct Motor_power_state {
 	double pow_4; //Back left
 };
 
-//Classes
-
 //Publishers
 ros::Publisher pub;
 
@@ -47,7 +45,7 @@ ros::ServiceServer motors_off;
 
 //Define used variable
 bool motor_state;
-int use_motors;
+int use_motors, use_MPU;
 Robot_velocity_state robot_velocity;
 
 void vel2motor(Motor_power_state &pow) {
@@ -63,6 +61,49 @@ void vel2motor(Motor_power_state &pow) {
 	pow.pow_2 = vmesni_izracun[2];
 	pow.pow_3 = vmesni_izracun[3];
 	pow.pow_4 = vmesni_izracun[4];
+	return;
+}
+
+//Classes
+class Robot {
+	private:
+		rc_mpu_data MPU_data;
+	public:
+		Robot(void);
+		void dmp_callback(void);
+
+
+};
+Robot::Robot(void) {
+	if (use_motors == 1)	{
+		cmd_vel_sub = nh.subscribe("/cmd_vel", 100, &twist_callback); 
+		if(rc_motor_init() == -1)	{
+			ROS_ERROR_STREAM("Motor initialization unsucessfull");
+			return -1;
+		}
+		if(rc_encoder_init() == -1)	{
+			ROS_ERROR_STREAM("Encoder initialization unsucessfull");
+		}
+		for(int i = 0; i<4; i++) {
+			if(rc_encoder_write(i, 0) == -1) {
+				ROS_ERROR_STREAM("Encoder set 0 unsucessfull");
+			}
+		}
+	}
+	if (use_MPU == 1) {
+		rc_mpu_config_t MPU_conf = rc_mpu_default_config();
+		//MPU_conf.enable_magnetometer = 1;
+		//MPU_conf.dmp_sample_rate = 50;
+		//rc_mpu_orientation_t ORIENTATION_Z_UP;
+		if(rc_mpu_initialize_dmp(&MPU_data, MPU_conf) == -1)	{
+			ROS_ERROR_STREAM("MPU initialization unsucessfull");
+			return -1;
+		}
+		rc_mpu_set_dmp_callback(dmp_callback);
+	}
+}
+void Robot::dmp_callback(void) {
+	ROS_INFO("podatki %f", MPU_data.accel[0]);
 	return;
 }
 
@@ -94,6 +135,7 @@ int main(int argc, char** argv) {
 
 	//Set node parameters
 	nh.getParam("/robot_node/use_motors", use_motors);
+	nh.getParam("/robot_node/use_MPU", use_MPU);
 	ROS_INFO(" %d", use_motors);
 
     //Start adverstisers, subscribers and services
@@ -105,7 +147,7 @@ int main(int argc, char** argv) {
 	motors_off = nh.advertiseService("/motors_off", motors_off_call);
 
 
-	ros::Rate loop_rate(10);
+	ros::Rate loop_rate(100);
 
 
 
@@ -115,24 +157,8 @@ int main(int argc, char** argv) {
 	Initializes the use of encoders.
 	If initialization is unsucessfol returns error.
 	*/
-	if (use_motors == 1)	{
-
-		
-
-		cmd_vel_sub = nh.subscribe("/cmd_vel", 100, &twist_callback); 
-		if(rc_motor_init() == -1)	{
-			ROS_ERROR_STREAM("Motor initialization unsucessfull");
-			return -1;
-		}
-		if(rc_encoder_init() == -1)	{
-			ROS_ERROR_STREAM("Encoder initialization unsucessfull");
-		}
-		for(int i = 0; i<4; i++) {
-			if(rc_encoder_write(i, 0) == -1) {
-				ROS_ERROR_STREAM("Encoder  set 0 unsucessfull");
-			}
-		}
-	}
+	
+	
 
 
 
@@ -163,6 +189,9 @@ int main(int argc, char** argv) {
 
 	if (use_motors){
 		rc_motor_cleanup();
+	}
+	if (use_MPU){
+		rc_mpu_power_off();
 	}
 	return 0;
 }
