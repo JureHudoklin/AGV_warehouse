@@ -46,21 +46,15 @@ void calc_line_error(line_error &arr, int* front_s, int* back_s) {
     /*This function calculates velocities in y direction and rotational vel z
     based on readings of 4 cetral sensors on front and back. Velocity values 
     is between -1 and 1. Sensor weight is set with parameter a.*/
-    double front[2], back[2], a, , p_err_y, p_err_z, Kp, Ki;
-    long all_frt[4], all_back[4];
-    a = 0.7; //Weight for outer and inner sensors
+    double front[2], back[2], p_err_y, p_err_z, Kp, Ki;
+    
+    long treshold;
+    
     Kp = 1.; //Proportional koefficient
     Ki = 0.3;   //Integral koefficient
+    treshold = 4096
 
-    for(int i = 2; i<6; i++) {  //Take out inner for sensors and put the values in all_frt and all_back
-        all_frt[i-2] = pow(front_s[i], 1);
-        all_back[i-2] = pow(back_s[i], 1);
-    }
-    //Sum the outer sensors 2 by 2, using weight a. Values are stored in front and back array
-    front[0] = a * (double)all_frt[1] + (1.- a) * (double)all_frt[0];
-    front[1] = a * (double)all_frt[2] + (1.- a) * (double)all_frt[3];
-    back[0] = a * (double)all_back[1] + (1.- a) * (double)all_back[0];
-    back[1] = a * (double)all_back[2] + (1.- a) * (double)all_back[3];
+    arrange_arrays(front, back, front_s, back_s);
 
     p_err_y = front[1]-front[0]+back[1]-back[0];    //Caluclate proportional err for y
     p_err_z = front[1]-front[0]-back[1]+back[0];    //Caluclate proportional err for z
@@ -70,6 +64,26 @@ void calc_line_error(line_error &arr, int* front_s, int* back_s) {
 
     arr.vel_y = Kp*p_err_y + Ki*arr.i_err_y / pow(2.,13.)); //Calulate velocity based on errors
     arr.vel_z = Kp*p_err_z + Ki*arr.i_err_z / pow(2.,13.)); //Scaling factor is  2**13
+    return;
+}
+
+void arrange_arrays(double &sum_front, double &sum_back, int* f_s, int* b_s) {
+    long all_frt[4], all_back[4];
+    double a;
+    a = 0.7; //Weight for outer and inner sensors
+
+    for(int i = 2; i<6; i++) {  //Take out inner for sensors and put the values in all_frt and all_back
+        all_frt[i-2] = pow(f_s[i], 1);
+        all_back[i-2] = pow(b_s[i], 1);
+    }
+
+
+    //Sum the outer sensors 2 by 2, using weight a. Values are stored in front and back array
+    sum_front[0] = a * (double)all_frt[1] + (1.- a) * (double)all_frt[0];
+    sum_front[1] = a * (double)all_frt[2] + (1.- a) * (double)all_frt[3];
+    sum_back[0] = a * (double)all_back[1] + (1.- a) * (double)all_back[0];
+    sum_back[1] = a * (double)all_back[2] + (1.- a) * (double)all_back[3];
+
     return;
 }
 

@@ -16,6 +16,7 @@
 
 #include <std_srvs/Empty.h>
 
+
 //Structures
 struct Robot_state_struct {
 	std::string ID_s;
