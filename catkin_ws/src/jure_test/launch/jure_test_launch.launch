@@ -1,0 +1,6 @@
+<launch>
+	<!-- jure_test launch file -->
+	<node pkg="jure_test" type="jure_test_cpp" name="jure_test_node" output ="screen">
+	</node>
+</launch>
+
