@@ -24,6 +24,8 @@ Motor: 50:1
 #include <nav_msgs/Odometry.h>
 
 #include <std_srvs/Empty.h>
+#include <dynamic_reconfigure/server.h>
+#include <robot/ReconfigureConfig.h>
 
 #define ANGLE_PER_ENC_PULSE 0.01047197551
 #define WHEEL_DIAMETER 38.1
@@ -41,23 +43,22 @@ Motor: 50:1
 
 //Structures
 struct Robot_vel_state {
-    double target_vx; 
-    double target_vy; 
-	double target_az; 
-	double actual_vx; 
-    double actual_vy; 
-	double actual_az; 
+    double target_v[3]; 
+	double actual_v[3]; 
 };
-struct Robot_vel_err {};
+struct Robot_vel_err {
+	double prop_err[3];
+	double integ_err[3];
+	double diff_err[3];
+};
 struct Robot_enc_val {
 	int enc[4];
 	ros::Time timestamp;
 };
-struct Motor_power_state {
-    double pow_1; //Front left
-    double pow_2; //Frpnt right
-	double pow_3; //Back right
-	double pow_4; //Back left
+struct PID_koef {
+	double P;
+	double I;
+	double D;
 };
 
 //Publishers
@@ -79,22 +80,37 @@ int use_motors, use_MPU, use_TOF, use_line;
 //Classes
 class Robot {
 	private:
-
+		Robot_vel_err robot_vel_err;
+		PID_koef PID;
+		double scaling_factor;
 	public:
+		//Initialize
 		//Variables
 		double line_values_f[8];
 		double line_values_b[8];
 		static rc_mpu_data_t MPU_data;
-		//STructures
+		//Structures
 		Robot_vel_state robot_vel;
-		Robot_vel_err robot_vel_err;
 		Robot_enc_val robot_enc_val;
 		//Methods
+		void set_PID(double p, double i, double d);
+		void set_scaling(double i);
 		static void dmp_callback(void);
 		void read_encoders(Robot_enc_val &old_val);
 		void calc_velocities(Robot_enc_val &old_val);
-		
+		void vel2power(double (&pwr)[4]);
+		void wheel_speed(double (&ws)[4] ,double velocities[3]);
 };
+void Robot::set_PID(double p, double i, double d) {
+	PID.P = p;
+	PID.I = i;
+	PID.D = d;
+	return;
+}
+void Robot::set_scaling(double i) {
+	scaling_factor = i;
+	return;
+}
 void Robot::dmp_callback(void) {
 
 			return;
@@ -112,7 +128,7 @@ void Robot::read_encoders(Robot_enc_val &old_val) {
 	return;
 }
 void Robot::calc_velocities(Robot_enc_val &old_val) {
-	robot_vel.actual_az = MPU_data.gyro[2];	//Angular velocity is read directly from gyro
+	robot_vel.actual_v[2] = MPU_data.gyro[2];	//Angular velocity is read directly from gyro
 
 	//In the loop below velocity (mm/s) for each wheel is calculated
 	double wheel_vel[4];
@@ -136,23 +152,57 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	vy[1] = 0.5 * sqrt(2.)*(-wheel_vel[1]+wheel_vel[2]);
 
 	// Calculated velocities are set for the robot object
-	robot_vel.actual_vx = (vx[0]+vx[1]) / 2.;
-	robot_vel.actual_vy = (vy[0]+vy[1]) / 2.;
+	robot_vel.actual_v[0] = (vx[0]+vx[1]) / 2.;
+	robot_vel.actual_v[1] = (vy[0]+vy[1]) / 2.;
+	return;
+}
+void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
+	ws[1] = 1.;
+	return;
+}
+void Robot::vel2power(double (&pwr)[4]) {
+	//First new errors are calucalted
+	double old_prop_err[3];
+	for(int i = 0; i<3; i++) {
+		old_prop_err[i] = robot_vel_err.prop_err[i];
+	}
+
+	double weighted_velocities[3];
+	for(int i = 0; i<3; i++) {
+		robot_vel_err.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];
+		robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i];
+		robot_vel_err.diff_err[i] = old_prop_err[i] - robot_vel_err.prop_err[i];
+		weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
+	}
+
+	double wheel_s[4];
+	wheel_speed(wheel_s, weighted_velocities);
+	pwr[0] = 1.;
+	pwr[1] = 1.;
+	pwr[2] = 1.;
+	pwr[3] = 1.;
 	return;
 }
 rc_mpu_data_t Robot::MPU_data;
 Robot robot_OBJ;
 
 
+//Callbacks
+void reconfigure_callback(robot::ReconfigureConfig &config, uint32_t level) {
+	robot_OBJ.set_PID(config.P_koef, config.I_koef, config.D_koef);
+	robot_OBJ.set_scaling(config.sf);
+	return;
+}
+
 void twist_callback(const geometry_msgs::Twist &twist) {		//Zakaj kle const. Zakaj argument v fn ce ga spodi ne dam
-	robot_OBJ.robot_vel.target_vx = twist.linear.x;
-	robot_OBJ.robot_vel.target_vy = twist.linear.y;
-	robot_OBJ.robot_vel.target_az = twist.angular.z;
+	robot_OBJ.robot_vel.target_v[0] = twist.linear.x;
+	robot_OBJ.robot_vel.target_v[1] = twist.linear.y;
+	robot_OBJ.robot_vel.target_v[2] = twist.angular.z;
 	ROS_INFO("nove_hitrosti");
 	return;
 }
 
-
+//Servic callbacks
 bool motors_on_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
     motor_state = true;
     return true;
@@ -179,6 +229,11 @@ int main(int argc, char** argv) {
 	nh.getParam("/robot_node/use_line", use_line);
 	nh.getParam("/robot_node/use_TOF", use_TOF);
 
+	//Set dynamic reconfigure
+	dynamic_reconfigure::Server<robot::ReconfigureConfig> server;
+	dynamic_reconfigure::Server<robot::ReconfigureConfig>::CallbackType rec_f;
+	rec_f = boost::bind(&reconfigure_callback, _1, _2);
+	server.setCallback(rec_f);
 
     //Start adverstisers, subscribers and services
     //pub = nh.advertise<std_msgs::Int32>("jure_topic", 1000);
@@ -241,17 +296,17 @@ int main(int argc, char** argv) {
 	while (ros::ok())
 	{
 		if (use_motors) {
+			double motor_power[4] = {0,0,0,0};	//Based on v_x,v_y,a_z set power for each motor
+
 			if (motor_state){
 
 				robot_OBJ.read_encoders(enc_val_old);
 				robot_OBJ.calc_velocities(enc_val_old);
-				Motor_power_state power = {0,0,0,0};  //Based on v_x,v_y,a_z set power for each motor
-
-
-				rc_motor_set(1, power.pow_1);
-				rc_motor_set(2, power.pow_2);
-				rc_motor_set(3, power.pow_3);
-				rc_motor_set(4, power.pow_4);
+				robot_OBJ.vel2power(motor_power);
+				  
+				for(int i = 0; i<4; i++) {
+					rc_motor_set(i+1, motor_power[i]);
+				}
 			}
 			else {
 				rc_motor_set(1,0);

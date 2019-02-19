@@ -94,10 +94,10 @@ generate_messages(
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
+generate_dynamic_reconfigure_options(
+  cfg/Reconfigure.cfg
 #   cfg/DynReconf2.cfg
-# )
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -136,6 +136,8 @@ include_directories(
 ## either from message generation or dynamic reconfigure
 #add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} robot_generate_messages_cpp)
 
+
+
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
@@ -149,6 +151,7 @@ add_executable(${PROJECT_NAME}_node src/robot_cpp.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
+add_dependencies(${PROJECT_NAME}_node ${PROJECT_NAME}_gencfg)
 add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
