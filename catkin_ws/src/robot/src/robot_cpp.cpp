@@ -31,15 +31,15 @@ Motor: 50:1
 #define WHEEL_DIAMETER 38.1
 
 //GPIO setup
-#define GP0_1 3, 17
-#define GP0_2 3, 20
-#define GP0_3 1, 17
-#define GP0_4 1, 25
+#define GP0_4 3, 17
+#define GP0_3 3, 20
+#define GP0_2 1, 17
+#define GP0_1 1, 25
 
-#define GP1_1 2, 3
-#define GP1_2 2, 2
-#define GP1_3 3, 1
-#define GP1_4 3, 2
+#define GP1_4 2, 3
+#define GP1_3 2, 2
+#define GP1_2 3, 1
+#define GP1_1 3, 2
 
 //Structures
 struct Robot_vel_state {
@@ -157,7 +157,10 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	return;
 }
 void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
-	ws[1] = 1.;
+	for(int i = 0; i<4; i++) {
+		double alpha = ((double)i*+1.)*M_PI/4.;
+		ws[i] = (b*velocities[2] + velocities[1]* cos(a1) - velocities[0]*sin(a1));
+	}
 	return;
 }
 void Robot::vel2power(double (&pwr)[4]) {
@@ -177,10 +180,10 @@ void Robot::vel2power(double (&pwr)[4]) {
 
 	double wheel_s[4];
 	wheel_speed(wheel_s, weighted_velocities);
-	pwr[0] = 1.;
-	pwr[1] = 1.;
-	pwr[2] = 1.;
-	pwr[3] = 1.;
+
+	for(int i = 0; i<3; i++) {
+		pwr[i] = wheel_s[i]/scaling_factor;
+	}
 	return;
 }
 rc_mpu_data_t Robot::MPU_data;
@@ -320,29 +323,29 @@ int main(int argc, char** argv) {
             robot::Line_sensor line_sen_msg;
 
             for(int j = 0; j<2; j++) {
-                rc_gpio_set_value(GP0_1, j);
+                rc_gpio_set_value(GP0_4, j);
                 for(int i = 0; i<8; i++) {
                     int a, b, c;
                     a = i & 0b001;
                     b = i & 0b010;
                     c = i & 0b100;
-                    rc_gpio_set_value(GP0_2, a);
-                    rc_gpio_set_value(GP0_3, b);
-                    rc_gpio_set_value(GP0_4, c);
+                    rc_gpio_set_value(GP0_1, a);
+                    rc_gpio_set_value(GP0_2, b);
+                    rc_gpio_set_value(GP0_3, c);
 
                     ros::Duration(0.01).sleep(); //Sleeps so that multiplexer has time to settle
 
                     if (j == 0) {
-                        robot_OBJ.line_values_f[i] = rc_adc_read_volt(1);
-                        robot_OBJ.line_values_b[i] = rc_adc_read_volt(0);
+                        robot_OBJ.line_values_f[i] = rc_adc_read_volt(3);
+                        robot_OBJ.line_values_b[i] = rc_adc_read_volt(4);
                     }
                     else {
-                        robot_OBJ.line_values_f[i] = rc_adc_read_volt(1)-robot_OBJ.line_values_f[i];
-                        robot_OBJ.line_values_b[i] = rc_adc_read_volt(0)-robot_OBJ.line_values_b[i];
+                        robot_OBJ.line_values_f[i] = rc_adc_read_volt(3)-robot_OBJ.line_values_f[i];
+                        robot_OBJ.line_values_b[i] = rc_adc_read_volt(4)-robot_OBJ.line_values_b[i];
                     }
                 }
             }
-            rc_gpio_set_value(GP0_1, 0);
+            rc_gpio_set_value(GP0_4, 0);
 			ROS_INFO(" %f", robot_OBJ.line_values_f[0]);
 
 			for (int i = 0; i<8; i++) {
