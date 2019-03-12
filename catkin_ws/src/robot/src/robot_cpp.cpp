@@ -129,7 +129,7 @@ void Robot::read_encoders(Robot_enc_val &old_val) {
 	}
 	old_val.timestamp = robot_enc_val.timestamp;
 	for (int i = 0; i<4; i++) {
-		robot_enc_val.enc[i] = rc_encoder_read(i+1);
+		robot_enc_val.enc[i] = -rc_encoder_read(i+1);
 	}
 	robot_enc_val.timestamp = ros::Time::now();
 	return;
@@ -144,7 +144,7 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 		double time_diff = robot_enc_val.timestamp.toSec() - old_val.timestamp.toSec();
 		wheel_vel[i] = ((double)enc_diff * ANGLE_PER_ENC_PULSE) / time_diff;
 		wheel_vel[i] = wheel_vel[i]*WHEEL_DIAMETER / 2.;
-		ROS_INFO("wheel velocity: %f", wheel_vel[i]);
+		ROS_INFO(" Actual wheel velocity: %f", wheel_vel[i]);
 	}
 	
 	/*
@@ -166,9 +166,9 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 }
 void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
 	for(int i = 0; i<4; i++) {
-		double alpha = ((double)i+1.)*M_PI/4.;
+		double alpha = (5*M_PI/4.)+(double)i*M_PI/2.;
 		double b = 100.;
-		ws[i] = (b*velocities[2] + velocities[1]* cos(alpha) - velocities[0]*sin(alpha));
+		ws[i] = (b*velocities[2] - velocities[1]* cos(alpha) + velocities[0]*sin(alpha));
 	}
 	return;
 }
@@ -186,14 +186,14 @@ void Robot::vel2power(double (&pwr)[4]) {
 		robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i];
 		robot_vel_err.diff_err[i] = old_prop_err[i] - robot_vel_err.prop_err[i];
 		weighted_velocities[i] = PID.P * robot_vel.target_v[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
-		ROS_INFO("target v %f, actual %f, weighted %f", robot_vel.target_v[i], robot_vel.actual_v[i], weighted_velocities[i]);
+		ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
 	}
 
 	double wheel_s[4];
 	wheel_speed(wheel_s, weighted_velocities);
 
 	for(int i = 0; i<4; i++) {
-		pwr[i] = wheel_s[i]/scaling_factor;
+		pwr[i] = wheel_s[i]/scaling_factor;		//o.1 pwr -> 120mm/s -> 150mm/s x
 		ROS_INFO("wheel speed: %f", wheel_s[i]);
 	}
 	return;
@@ -278,7 +278,7 @@ int main(int argc, char** argv) {
 				ROS_ERROR_STREAM("Encoder set 0 unsucessfull");
 			}
 			else {
-				robot_OBJ.robot_enc_val.enc[i] = rc_encoder_read(i);
+				robot_OBJ.robot_enc_val.enc[i] = -rc_encoder_read(i);
 			}	
 		}
 		robot_OBJ.robot_enc_val.timestamp = ros::Time::now();
@@ -330,8 +330,9 @@ int main(int argc, char** argv) {
 					m = motor_power[i];
 					if(m > 0.4 || m<-0.4) {
 						m = 0.;
+						ROS_INFO("wheel %d, power EXCEED", i);
 					}
-					rc_motor_set(i+1, -m);
+					rc_motor_set(i+1, m);
 				}
 			}
 			else {
