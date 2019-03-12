@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
 			rc_motor_set(3, 0.2);
 			rc_motor_set(4, 0.2);
 		}
-		ros::Duration(1).sleep();
+		ros::Duration(10).sleep();
 		for (int i = 0; i<4; i++) {
 			j = rc_encoder_read(i+1);
 			ROS_INFO("Encoder after %d, %d", i, j);

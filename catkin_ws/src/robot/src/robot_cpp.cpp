@@ -1,6 +1,6 @@
 // http://mate.tue.nl/mate/pdfs/7566.pdf reference for robot controll
 // http://www-ist.massey.ac.nz/conferences/ICARA2004/files/Papers/Paper74_ICARA2004_425_428.pdf
-// ROS_MASTER_URI=http://192.168.7.1:11311 on BBB
+// ROS_MASTER_URI=http://192.168.7.1:11311 on BBB 192.168.43.179
 // ROS_IP=192.168.7.2 on BBB
 
 
@@ -33,6 +33,7 @@ Motor: 50:1
 
 #define ANGLE_PER_ENC_PULSE 0.01047197551
 #define WHEEL_DIAMETER 38.1
+#define DEGREE2RADIANS 0.01745329252
 
 //GPIO setup
 #define GP0_4 3, 17
@@ -129,13 +130,13 @@ void Robot::read_encoders(Robot_enc_val &old_val) {
 	}
 	old_val.timestamp = robot_enc_val.timestamp;
 	for (int i = 0; i<4; i++) {
-		robot_enc_val.enc[i] = -rc_encoder_read(i+1);
+		robot_enc_val.enc[i] = rc_encoder_read(i+1);
 	}
 	robot_enc_val.timestamp = ros::Time::now();
 	return;
 }
 void Robot::calc_velocities(Robot_enc_val &old_val) {
-	robot_vel.actual_v[2] = MPU_data.gyro[2];	//Angular velocity is read directly from gyro
+	robot_vel.actual_v[2] = MPU_data.gyro[2] * DEGREE2RADIANS;	//Angular velocity is read directly from gyro
 
 	//In the loop below velocity (mm/s) for each wheel is calculated
 	double wheel_vel[4];
@@ -153,39 +154,50 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	*/
 	double vx[2];
 	double vy[2];
-	vx[0] = (wheel_vel[0]-wheel_vel[1])/sqrt(2.);
-	vy[0] = 0.5 * sqrt(2.)*(-wheel_vel[1]+wheel_vel[2]);
+	vx[0] = wheel_vel[2]*sqrt(2.)-wheel_vel[1]*sqrt(2.);   //(wheel_vel[0]-wheel_vel[1])/sqrt(2.);
+	vy[0] = -wheel_vel[1]*sqrt(2.)+wheel_vel[0]*sqrt(2.);   //0.5 * sqrt(2.)*(-wheel_vel[1]+wheel_vel[2]);
 
 	vx[1] = 0.5 * sqrt(2.)*(-wheel_vel[2]+wheel_vel[3]);
 	vy[1] = 0.5 * sqrt(2.)*(-wheel_vel[1]+wheel_vel[2]);
 
 	// Calculated velocities are set for the robot object
-	robot_vel.actual_v[0] = (vx[0]+vx[1]) / 2.;
-	robot_vel.actual_v[1] = (vy[0]+vy[1]) / 2.;
+	robot_vel.actual_v[0] = vx[0];//+vx[1]) / 2.;
+	robot_vel.actual_v[1] = vy[0];//+vy[1]) / 2.;
 	return;
 }
 void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
 	for(int i = 0; i<4; i++) {
-		double alpha = (5*M_PI/4.)+(double)i*M_PI/2.;
+		double alpha = (3*M_PI/4.)+(double)i*M_PI/2.;
 		double b = 100.;
-		ws[i] = (b*velocities[2] - velocities[1]* cos(alpha) + velocities[0]*sin(alpha));
+		ws[i] = (b*velocities[2] + velocities[1]* sin(alpha) + velocities[0]*cos(alpha));
 	}
 	return;
 }
 void Robot::vel2power(double (&pwr)[4]) {
 	//First new errors are calucalted
 	double old_prop_err[3];
+	int integral_on = 0;
 	for(int i = 0; i<3; i++) {
+		if(robot_vel.target_v[i] != 0) {
+			integral_on = 1;
+		}
 		old_prop_err[i] = robot_vel_err.prop_err[i];
 	}
 
 	double weighted_velocities[3];
 	
 	for(int i = 0; i<3; i++) {
-		robot_vel_err.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];	//TEGA NE RABIM PROPORCIONALNO
-		robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i];
-		robot_vel_err.diff_err[i] = old_prop_err[i] - robot_vel_err.prop_err[i];
-		weighted_velocities[i] = PID.P * robot_vel.target_v[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
+		if(integral_on == 1) {
+			robot_vel_err.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];
+			robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i];
+			robot_vel_err.diff_err[i] = old_prop_err[i] - robot_vel_err.prop_err[i];
+		}
+		else {
+			robot_vel_err.prop_err[i] = 0;
+			robot_vel_err.integ_err[i] = 0;
+			robot_vel_err.diff_err[i] = 0;
+		}
+		weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
 		ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
 	}
 
@@ -278,7 +290,7 @@ int main(int argc, char** argv) {
 				ROS_ERROR_STREAM("Encoder set 0 unsucessfull");
 			}
 			else {
-				robot_OBJ.robot_enc_val.enc[i] = -rc_encoder_read(i);
+				robot_OBJ.robot_enc_val.enc[i] = rc_encoder_read(i);
 			}	
 		}
 		robot_OBJ.robot_enc_val.timestamp = ros::Time::now();
@@ -311,7 +323,7 @@ int main(int argc, char** argv) {
 
 
 
-	ros::Rate loop_rate(0.4);
+	ros::Rate loop_rate(100);
 
 	Robot_enc_val enc_val_old = {{0,0,0,0},ros::Time::now()};
 	while (ros::ok())
@@ -332,7 +344,7 @@ int main(int argc, char** argv) {
 						m = 0.;
 						ROS_INFO("wheel %d, power EXCEED", i);
 					}
-					rc_motor_set(i+1, m);
+					rc_motor_set(i+1, -m);
 				}
 			}
 			else {
@@ -360,7 +372,7 @@ int main(int argc, char** argv) {
                     rc_gpio_set_value(GP0_2, b);
                     rc_gpio_set_value(GP0_3, c);
 
-                    ros::Duration(0.05).sleep(); //Sleeps so that multiplexer has time to settle
+                    //ros::Duration(0.0).sleep(); //Sleeps so that multiplexer has time to settle
 					//ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
 					
 					//ROS_INFO(" %f, %d front", rc_adc_read_volt(3), j);
