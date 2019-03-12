@@ -26,7 +26,27 @@ int main(int argc, char** argv) {
 	rc_gpio_init(GP0_2, GPIOHANDLE_REQUEST_OUTPUT); //DIG_0
 	rc_gpio_init(GP0_3, GPIOHANDLE_REQUEST_OUTPUT); //DIG_1
 	rc_gpio_init(GP0_4, GPIOHANDLE_REQUEST_OUTPUT); //DIG_2
-	ros::Rate loop_rate(20);
+	
+	int use_motors = 1;
+	if (use_motors == 1)	{
+		ROS_INFO("Initializing motors and encoders");
+		//cmd_vel_sub = nh.subscribe("/cmd_vel", 100, &twist_callback); 
+		if(rc_motor_init() == -1)	{
+			ROS_ERROR_STREAM("Motor initialization unsucessfull");
+		}
+		if(rc_encoder_init() == -1)	{
+			ROS_ERROR_STREAM("Encoder initialization unsucessfull");
+		}
+		for(int i = 1; i<5; i++) {
+			if(rc_encoder_write(i, 0) == -1) {
+				ROS_ERROR_STREAM("Encoder set 0 unsucessfull");
+			}	
+		}
+	}
+
+
+	ros::Rate loop_rate(0.5);
+	int pass = 0;
 
 	while (ros::ok())
 	{
@@ -36,22 +56,40 @@ int main(int argc, char** argv) {
 		++spremenljivka.data;
 
 		int m;
-
-		for (int i = 0;i<8;i++) {
-			for (int k = 0;k<3;k++) {
-				m = (i & ( 1 << k )) >> k;
-			}
-		rc_gpio_set_value(GP0_2, 0);
-		ros::Duration(2).sleep();
-		rc_gpio_set_value(GP0_2, 1);
-		ros::Duration(2).sleep();	
-
+		int j;
+		for (int i = 0; i<4; i++) {
+			j = rc_encoder_read(i+1);
+			ROS_INFO("Encoder %d, %d", i, j);
 		}
+
+		if(pass == 0) {
+			rc_motor_set(1, 0.2);
+			ROS_INFO("motor on");
+			rc_motor_set(2, 0.2);
+			rc_motor_set(3, 0.2);
+			rc_motor_set(4, 0.2);
+		}
+		ros::Duration(1).sleep();
+		for (int i = 0; i<4; i++) {
+			j = rc_encoder_read(i+1);
+			ROS_INFO("Encoder after %d, %d", i, j);
+		}
+		rc_motor_set(1,0);
+		rc_motor_set(2,0);
+		rc_motor_set(3,0);
+		rc_motor_set(4,0);
+		pass++;
+
+
+
+
 
 		loop_rate.sleep();
 
 		
 	}
+	rc_motor_cleanup();
+	rc_encoder_cleanup();
 	rc_adc_cleanup();
 	return 0;
 }

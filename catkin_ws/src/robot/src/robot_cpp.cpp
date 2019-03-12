@@ -1,5 +1,9 @@
 // http://mate.tue.nl/mate/pdfs/7566.pdf reference for robot controll
 // http://www-ist.massey.ac.nz/conferences/ICARA2004/files/Papers/Paper74_ICARA2004_425_428.pdf
+// ROS_MASTER_URI=http://192.168.7.1:11311 on BBB
+// ROS_IP=192.168.7.2 on BBB
+
+
 
 /*
 Encoder: 12CPR
@@ -75,6 +79,9 @@ ros::ServiceServer motors_off;
 bool motor_state;
 int use_motors, use_MPU, use_TOF, use_line;
 
+//--------------------------TEST_--------------
+double power_on_wheel =0.;
+
 
 
 //Classes
@@ -137,6 +144,7 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 		double time_diff = robot_enc_val.timestamp.toSec() - old_val.timestamp.toSec();
 		wheel_vel[i] = ((double)enc_diff * ANGLE_PER_ENC_PULSE) / time_diff;
 		wheel_vel[i] = wheel_vel[i]*WHEEL_DIAMETER / 2.;
+		ROS_INFO("wheel velocity: %f", wheel_vel[i]);
 	}
 	
 	/*
@@ -158,8 +166,9 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 }
 void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
 	for(int i = 0; i<4; i++) {
-		double alpha = ((double)i*+1.)*M_PI/4.;
-		ws[i] = (b*velocities[2] + velocities[1]* cos(a1) - velocities[0]*sin(a1));
+		double alpha = ((double)i+1.)*M_PI/4.;
+		double b = 100.;
+		ws[i] = (b*velocities[2] + velocities[1]* cos(alpha) - velocities[0]*sin(alpha));
 	}
 	return;
 }
@@ -171,18 +180,21 @@ void Robot::vel2power(double (&pwr)[4]) {
 	}
 
 	double weighted_velocities[3];
+	
 	for(int i = 0; i<3; i++) {
-		robot_vel_err.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];
+		robot_vel_err.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];	//TEGA NE RABIM PROPORCIONALNO
 		robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i];
 		robot_vel_err.diff_err[i] = old_prop_err[i] - robot_vel_err.prop_err[i];
-		weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
+		weighted_velocities[i] = PID.P * robot_vel.target_v[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
+		ROS_INFO("target v %f, actual %f, weighted %f", robot_vel.target_v[i], robot_vel.actual_v[i], weighted_velocities[i]);
 	}
 
 	double wheel_s[4];
 	wheel_speed(wheel_s, weighted_velocities);
 
-	for(int i = 0; i<3; i++) {
+	for(int i = 0; i<4; i++) {
 		pwr[i] = wheel_s[i]/scaling_factor;
+		ROS_INFO("wheel speed: %f", wheel_s[i]);
 	}
 	return;
 }
@@ -194,6 +206,12 @@ Robot robot_OBJ;
 void reconfigure_callback(robot::ReconfigureConfig &config, uint32_t level) {
 	robot_OBJ.set_PID(config.P_koef, config.I_koef, config.D_koef);
 	robot_OBJ.set_scaling(config.sf);
+	robot_OBJ.robot_vel.target_v[0] = config.x;
+	robot_OBJ.robot_vel.target_v[1] = config.y;
+	robot_OBJ.robot_vel.target_v[2] = config.z;
+	power_on_wheel = config.x;
+
+	ROS_INFO("%f, %f, %f", config.P_koef, config.I_koef, config.D_koef, config.x);
 	return;
 }
 
@@ -293,7 +311,7 @@ int main(int argc, char** argv) {
 
 
 
-	ros::Rate loop_rate(10);
+	ros::Rate loop_rate(0.4);
 
 	Robot_enc_val enc_val_old = {{0,0,0,0},ros::Time::now()};
 	while (ros::ok())
@@ -308,7 +326,12 @@ int main(int argc, char** argv) {
 				robot_OBJ.vel2power(motor_power);
 				  
 				for(int i = 0; i<4; i++) {
-					rc_motor_set(i+1, motor_power[i]);
+					double m;
+					m = motor_power[i];
+					if(m > 0.4 || m<-0.4) {
+						m = 0.;
+					}
+					rc_motor_set(i+1, -m);
 				}
 			}
 			else {
@@ -324,6 +347,9 @@ int main(int argc, char** argv) {
 
             for(int j = 0; j<2; j++) {
                 rc_gpio_set_value(GP0_4, j);
+
+				
+
                 for(int i = 0; i<8; i++) {
                     int a, b, c;
                     a = i & 0b001;
@@ -333,20 +359,27 @@ int main(int argc, char** argv) {
                     rc_gpio_set_value(GP0_2, b);
                     rc_gpio_set_value(GP0_3, c);
 
-                    ros::Duration(0.01).sleep(); //Sleeps so that multiplexer has time to settle
+                    ros::Duration(0.05).sleep(); //Sleeps so that multiplexer has time to settle
+					//ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
+					
+					//ROS_INFO(" %f, %d front", rc_adc_read_volt(3), j);
+					//ros::Duration(0.5).sleep();
 
                     if (j == 0) {
                         robot_OBJ.line_values_f[i] = rc_adc_read_volt(3);
                         robot_OBJ.line_values_b[i] = rc_adc_read_volt(4);
+						//ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
                     }
                     else {
-                        robot_OBJ.line_values_f[i] = rc_adc_read_volt(3)-robot_OBJ.line_values_f[i];
-                        robot_OBJ.line_values_b[i] = rc_adc_read_volt(4)-robot_OBJ.line_values_b[i];
+                        robot_OBJ.line_values_f[i] = -rc_adc_read_volt(3)+robot_OBJ.line_values_f[i];
+                        robot_OBJ.line_values_b[i] = -rc_adc_read_volt(4)+robot_OBJ.line_values_b[i];
+						//ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
                     }
                 }
             }
             rc_gpio_set_value(GP0_4, 0);
-			ROS_INFO(" %f", robot_OBJ.line_values_f[0]);
+			//ROS_INFO(" %f", robot_OBJ.line_values_f[0]);
+			//ROS_INFO(" %f", robot_OBJ.line_values_b[0]);
 
 			for (int i = 0; i<8; i++) {
 				line_sen_msg.front_sensors[i] = robot_OBJ.line_values_f[i];
@@ -362,9 +395,9 @@ int main(int argc, char** argv) {
 		if (use_MPU) {
 			//robot_OBJ.calc_vel_err();
 			//rc_mpu_read_gyro(&robot_OBJ.MPU_data);
-			ROS_INFO(" %f,%f,%f", robot_OBJ.MPU_data.gyro[2], robot_OBJ.MPU_data.gyro[1], robot_OBJ.MPU_data.gyro[0]);
+			//ROS_INFO(" %f,%f,%f", robot_OBJ.MPU_data.gyro[2], robot_OBJ.MPU_data.gyro[1], robot_OBJ.MPU_data.gyro[0]);
 			//ROS_INFO(" %f", robot_OBJ.MPU_data.accel[2], robot_OBJ.MPU_data.accel[1]);
-			ROS_INFO(" %f","%f", robot_OBJ.MPU_data.dmp_quat[0], robot_OBJ.MPU_data.dmp_quat[1]);
+			//ROS_INFO(" %f","%f", robot_OBJ.MPU_data.dmp_quat[0], robot_OBJ.MPU_data.dmp_quat[1]);
 		}	
 
 		ros::spinOnce();
