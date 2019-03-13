@@ -45,8 +45,9 @@ int main(int argc, char** argv) {
 	}
 
 
-	ros::Rate loop_rate(0.5);
+	ros::Rate loop_rate(100);
 	int pass = 0;
+	ros::Time time_now;
 
 	while (ros::ok())
 	{
@@ -63,27 +64,30 @@ int main(int argc, char** argv) {
 		}
 
 		if(pass == 0) {
-			rc_motor_set(1, 0.2);
-			ROS_INFO("motor on");
-			rc_motor_set(2, 0.2);
-			rc_motor_set(3, 0.2);
-			rc_motor_set(4, 0.2);
+			rc_motor_set(1, 0.1);
+			rc_motor_set(2, 0.1);
+			rc_motor_set(3, 0.1);
+			rc_motor_set(4, 0.1);
 		}
-		ros::Duration(10).sleep();
-		for (int i = 0; i<4; i++) {
-			j = rc_encoder_read(i+1);
-			ROS_INFO("Encoder after %d, %d", i, j);
+
+		time_now = ros::Time::now();
+		ROS_INFO("Cas 0: %f", time_now.toSec());
+		//ros::Duration(10).sleep();
+		int enc_val = 0;
+		while(enc_val<6000) {
+			enc_val = -rc_encoder_read(1);
 		}
+		time_now = ros::Time::now();
+		ROS_INFO("Cas 0: %f", time_now.toSec());
+		ROS_INFO("enc_val %d", enc_val);
+
 		rc_motor_set(1,0);
 		rc_motor_set(2,0);
 		rc_motor_set(3,0);
 		rc_motor_set(4,0);
 		pass++;
 
-
-
-
-
+		return 0;
 		loop_rate.sleep();
 
 		

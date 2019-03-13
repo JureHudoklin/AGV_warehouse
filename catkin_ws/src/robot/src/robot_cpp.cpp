@@ -1,7 +1,7 @@
 // http://mate.tue.nl/mate/pdfs/7566.pdf reference for robot controll
 // http://www-ist.massey.ac.nz/conferences/ICARA2004/files/Papers/Paper74_ICARA2004_425_428.pdf
-// ROS_MASTER_URI=http://192.168.7.1:11311 on BBB 192.168.43.179
-// ROS_IP=192.168.7.2 on BBB
+// export ROS_MASTER_URI=http://192.168.43.179:11311 on BBB 192.168.43.179
+// export ROS_IP=192.168.43.149 on BBB
 
 
 
@@ -9,6 +9,7 @@
 Encoder: 12CPR
 Motor: 50:1
 */
+
 #include <math.h>
 #include <ros/ros.h>
 #include <string>
@@ -23,9 +24,11 @@ Motor: 50:1
 #include <sensor_msgs/Range.h>
 #include <robot/Control.h>
 #include <robot/Line_sensor.h>
+#include <robot/coordinate_sys_rotate.h>
 
 #include <geometry_msgs/Twist.h>
 #include <nav_msgs/Odometry.h>
+#include <tf/transform_broadcaster.h>
 
 #include <std_srvs/Empty.h>
 #include <dynamic_reconfigure/server.h>
@@ -65,9 +68,14 @@ struct PID_koef {
 	double I;
 	double D;
 };
+struct Vel_Pose {
+	double x,y,z;
+	double a_x, a_y, a_z;
+};
 
 //Publishers
 ros::Publisher line_sen_pub; // topic = line_sen
+ros::Publisher odom_pub;
 
 //Subscribers
 ros::Subscriber cmd_vel_sub; 
@@ -94,12 +102,15 @@ class Robot {
 	public:
 		//Initialize
 		//Variables
+		static double coordinate_ofset;
+		static int use_global_ks;
 		double line_values_f[8];
 		double line_values_b[8];
 		static rc_mpu_data_t MPU_data;
 		//Structures
 		Robot_vel_state robot_vel;
 		Robot_enc_val robot_enc_val;
+		Vel_Pose vel_pose;
 		//Methods
 		void set_PID(double p, double i, double d);
 		void set_scaling(double i);
@@ -120,7 +131,7 @@ void Robot::set_scaling(double i) {
 	return;
 }
 void Robot::dmp_callback(void) {
-
+	//Add here if any callback is needed after new dmp_data
 			return;
 		}
 void Robot::read_encoders(Robot_enc_val &old_val) {
@@ -154,8 +165,8 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	*/
 	double vx[2];
 	double vy[2];
-	vx[0] = wheel_vel[2]*sqrt(2.)-wheel_vel[1]*sqrt(2.);   //(wheel_vel[0]-wheel_vel[1])/sqrt(2.);
-	vy[0] = -wheel_vel[1]*sqrt(2.)+wheel_vel[0]*sqrt(2.);   //0.5 * sqrt(2.)*(-wheel_vel[1]+wheel_vel[2]);
+	vx[0] = wheel_vel[2]*sqrt(2.)/2-wheel_vel[1]*sqrt(2.)/2;   
+	vy[0] = -wheel_vel[1]*sqrt(2.)+wheel_vel[0]*sqrt(2.);   
 
 	vx[1] = 0.5 * sqrt(2.)*(-wheel_vel[2]+wheel_vel[3]);
 	vy[1] = 0.5 * sqrt(2.)*(-wheel_vel[1]+wheel_vel[2]);
@@ -211,6 +222,8 @@ void Robot::vel2power(double (&pwr)[4]) {
 	return;
 }
 rc_mpu_data_t Robot::MPU_data;
+double Robot::coordinate_ofset = 0;
+int Robot::use_global_ks = 0;
 Robot robot_OBJ;
 
 
@@ -227,7 +240,7 @@ void reconfigure_callback(robot::ReconfigureConfig &config, uint32_t level) {
 	return;
 }
 
-void twist_callback(const geometry_msgs::Twist &twist) {		//Zakaj kle const. Zakaj argument v fn ce ga spodi ne dam
+void twist_callback(const geometry_msgs::Twist &twist) {
 	robot_OBJ.robot_vel.target_v[0] = twist.linear.x;
 	robot_OBJ.robot_vel.target_v[1] = twist.linear.y;
 	robot_OBJ.robot_vel.target_v[2] = twist.angular.z;
@@ -245,6 +258,21 @@ bool motors_off_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &r
     motor_state = false;
     return true;
 }
+bool KS_rotate_call(robot::coordinate_sys_rotate::Request &req,
+					robot::coordinate_sys_rotate::Response &res) {
+	robot_OBJ.use_global_ks = req.use_global;
+
+	double ch_zero = -robot_OBJ.vel_pose.a_x;
+	robot_OBJ.coordinate_ofset = ch_zero + req.KS_ofset;
+	res.success = 1;
+
+	robot_OBJ.vel_pose.x = 0;
+	robot_OBJ.vel_pose.y = 0;
+	robot_OBJ.vel_pose.z = 0;
+	robot_OBJ.vel_pose.a_y = 0;
+	robot_OBJ.vel_pose.a_z = 0;
+	return true;
+}
 
 
 //------------------------------------------------------------------------------------------------------------------//
@@ -255,6 +283,9 @@ int main(int argc, char** argv) {
     //Define and run the node
 	ros::init(argc, argv, "robot");
 	ros::NodeHandle nh;
+
+	tf::TransformBroadcaster odom_broadcaster;
+
 
 	//Set node parameters
 	nh.getParam("/robot_node/use_motors", use_motors);
@@ -300,11 +331,19 @@ int main(int argc, char** argv) {
 		rc_mpu_config_t MPU_conf = rc_mpu_default_config();
 		MPU_conf.dmp_fetch_accel_gyro = 1;
 		//MPU_conf.enable_magnetometer = 1;
-		//MPU_conf.dmp_sample_rate = 50;
-		//rc_mpu_orientation_t ORIENTATION_Z_UP;
+		MPU_conf.dmp_sample_rate = 100;
 		if(rc_mpu_initialize_dmp(&robot_OBJ.MPU_data, MPU_conf) == -1)	{
 			ROS_ERROR_STREAM("MPU initialization unsucessfull");
 		}
+		robot_OBJ.vel_pose.x = 0;
+		robot_OBJ.vel_pose.y = 0;
+		robot_OBJ.vel_pose.z = 0;
+		robot_OBJ.vel_pose.a_x = 0;
+		robot_OBJ.vel_pose.a_y = 0;
+		robot_OBJ.vel_pose.a_z = 0;
+
+
+		odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 50);
 		rc_mpu_set_dmp_callback(Robot::dmp_callback);
 	}
 	if (use_line) {
@@ -324,10 +363,14 @@ int main(int argc, char** argv) {
 
 
 	ros::Rate loop_rate(100);
+	ros::Time current_time, last_time;
+  	current_time = ros::Time::now();
+  	last_time = ros::Time::now();
 
 	Robot_enc_val enc_val_old = {{0,0,0,0},ros::Time::now()};
 	while (ros::ok())
 	{
+		current_time = ros::Time::now();
 		if (use_motors) {
 			double motor_power[4] = {0,0,0,0};	//Based on v_x,v_y,a_z set power for each motor
 
@@ -336,6 +379,7 @@ int main(int argc, char** argv) {
 				robot_OBJ.read_encoders(enc_val_old);
 				robot_OBJ.calc_velocities(enc_val_old);
 				robot_OBJ.vel2power(motor_power);
+
 				  
 				for(int i = 0; i<4; i++) {
 					double m;
@@ -406,13 +450,59 @@ int main(int argc, char** argv) {
 		}
 
 		if (use_MPU) {
-			//robot_OBJ.calc_vel_err();
-			//rc_mpu_read_gyro(&robot_OBJ.MPU_data);
-			//ROS_INFO(" %f,%f,%f", robot_OBJ.MPU_data.gyro[2], robot_OBJ.MPU_data.gyro[1], robot_OBJ.MPU_data.gyro[0]);
-			//ROS_INFO(" %f", robot_OBJ.MPU_data.accel[2], robot_OBJ.MPU_data.accel[1]);
-			//ROS_INFO(" %f","%f", robot_OBJ.MPU_data.dmp_quat[0], robot_OBJ.MPU_data.dmp_quat[1]);
-		}	
+			//http://wiki.ros.org/navigation/Tutorials/RobotSetup/Odom
+			current_time = ros::Time::now();
+			double dt = (current_time - last_time).toSec();
 
+			//Calculater move change in x,y coordina. Angle is set based on gyro.
+			robot_OBJ.vel_pose.a_z = robot_OBJ.MPU_data.dmp_TaitBryan[2];
+			double dh = robot_OBJ.vel_pose.a_z + robot_OBJ.coordinate_ofset;
+			double delta_x = (robot_OBJ.robot_vel.actual_v[0]*cos(dh) - robot_OBJ.robot_vel.actual_v[0]*sin(dh))*dt;
+			double delta_y = (robot_OBJ.robot_vel.actual_v[0]*sin(dh) + robot_OBJ.robot_vel.actual_v[0]*cos(dh))*dt;
+
+			geometry_msgs::Quaternion odom_quat;
+			//Save position changes to robot object
+			robot_OBJ.vel_pose.x += delta_x;
+			robot_OBJ.vel_pose.y += delta_y;
+			
+			//Create quaternion from gyro + ofset for robot
+			odom_quat = tf::createQuaternionMsgFromYaw(dh);
+
+			//Pupulate odom_trans
+			geometry_msgs::TransformStamped odom_trans;
+			odom_trans.header.stamp = current_time;
+			odom_trans.header.frame_id = "global";
+			odom_trans.child_frame_id = "robot";
+
+			odom_trans.transform.translation.x = robot_OBJ.vel_pose.x;
+			odom_trans.transform.translation.y = robot_OBJ.vel_pose.y;
+			odom_trans.transform.translation.z = 0.0;
+			odom_trans.transform.rotation = odom_quat;
+
+			//Brodcast transform
+			odom_broadcaster.sendTransform(odom_trans);
+
+			//next, we'll publish the odometry message over ROS
+			nav_msgs::Odometry odom;
+			odom.header.stamp = current_time;
+			odom.header.frame_id = "global";
+
+			//Set the position
+			odom.pose.pose.position.x = robot_OBJ.vel_pose.x;
+			odom.pose.pose.position.y = robot_OBJ.vel_pose.y;
+			odom.pose.pose.position.z = 0.0;
+			odom.pose.pose.orientation = odom_quat;
+
+			//Set the velocity
+			odom.child_frame_id = "robot";
+			odom.twist.twist.linear.x = robot_OBJ.robot_vel.actual_v[0];
+			odom.twist.twist.linear.y = robot_OBJ.robot_vel.actual_v[1];
+			odom.twist.twist.angular.z = robot_OBJ.robot_vel.actual_v[2];
+ 
+			//Publish the message
+			odom_pub.publish(odom);
+		}	
+		last_time = ros::Time::now();
 		ros::spinOnce();
 		loop_rate.sleep();
 	}

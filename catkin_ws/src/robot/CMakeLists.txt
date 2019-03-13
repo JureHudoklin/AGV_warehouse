@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   std_srvs
   message_generation
+  tf
 )
 
 ## System dependencies are found with CMake's conventions
@@ -59,11 +60,11 @@ add_message_files(
 )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
+add_service_files(
+  FILES
+  coordinate_sys_rotate.srv
 #   Service2.srv
-# )
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -111,7 +112,7 @@ generate_dynamic_reconfigure_options(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES robot
- CATKIN_DEPENDS dynamic_reconfigure nav_msgs roscpp sensor_msgs std_msgs std_srvs message_runtime
+ CATKIN_DEPENDS dynamic_reconfigure nav_msgs roscpp sensor_msgs std_msgs std_srvs message_runtime tf
 #  DEPENDS system_lib
 )
 
