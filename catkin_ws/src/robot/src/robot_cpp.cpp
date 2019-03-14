@@ -51,8 +51,8 @@ Motor: 50:1
 
 //Structures
 struct Robot_vel_state {
-    double target_v[3]; 
-	double actual_v[3]; 
+    double target_v[3]; //Is set based on the Koordinate system used (global or robot)
+	double actual_v[3]; //Is always the velocity in robot KS
 };
 struct Robot_vel_err {
 	double prop_err[3];
@@ -72,6 +72,7 @@ struct Vel_Pose {
 	double x,y,z;
 	double a_x, a_y, a_z;
 };
+void rotate_velocities(double angle, double global_vel[3],double (&robot_vel)[3]);
 
 //Publishers
 ros::Publisher line_sen_pub; // topic = line_sen
@@ -82,7 +83,8 @@ ros::Subscriber cmd_vel_sub;
            
 //Services
 ros::ServiceServer motors_on; 
-ros::ServiceServer motors_off; 
+ros::ServiceServer motors_off;
+ros::ServiceServer KS_rotate; 
 
 //Define used variable
 bool motor_state;
@@ -106,6 +108,7 @@ class Robot {
 		static int use_global_ks;
 		double line_values_f[8];
 		double line_values_b[8];
+		ros::Time current_time, last_time;
 		static rc_mpu_data_t MPU_data;
 		//Structures
 		Robot_vel_state robot_vel;
@@ -117,6 +120,7 @@ class Robot {
 		static void dmp_callback(void);
 		void read_encoders(Robot_enc_val &old_val);
 		void calc_velocities(Robot_enc_val &old_val);
+		void weigh_velocities(double(& weighted_velocities)[3], double pr_err[3]);
 		void vel2power(double (&pwr)[4]);
 		void wheel_speed(double (&ws)[4] ,double velocities[3]);
 };
@@ -165,11 +169,11 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	*/
 	double vx[2];
 	double vy[2];
-	vx[0] = wheel_vel[2]*sqrt(2.)/2-wheel_vel[1]*sqrt(2.)/2;   
-	vy[0] = -wheel_vel[1]*sqrt(2.)+wheel_vel[0]*sqrt(2.);   
+	vx[0] = wheel_vel[2]*sqrt(2.)/2.-wheel_vel[1]*sqrt(2.)/2.;   
+	vy[0] = -wheel_vel[1]*sqrt(2.)/2.+wheel_vel[0]*sqrt(2.)/2.;   
 
-	vx[1] = 0.5 * sqrt(2.)*(-wheel_vel[2]+wheel_vel[3]);
-	vy[1] = 0.5 * sqrt(2.)*(-wheel_vel[1]+wheel_vel[2]);
+	vx[1] = 0.5 * sqrt(2.)*(+wheel_vel[2]+wheel_vel[3]);
+	vy[1] = 0.5 * sqrt(2.)*(+wheel_vel[1]-wheel_vel[2]);
 
 	// Calculated velocities are set for the robot object
 	robot_vel.actual_v[0] = vx[0];//+vx[1]) / 2.;
@@ -184,6 +188,38 @@ void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
 	}
 	return;
 }
+void Robot::weigh_velocities(double(& weighted_velocities)[3], double pr_err[3]) {
+	double dt = current_time.toSec()-last_time.toSec();
+
+
+	if(use_global_ks == 1) {
+		double ang = vel_pose.a_z+coordinate_ofset;
+		double loc_vel[3];
+		rotate_velocities(ang, robot_vel.actual_v, loc_vel);
+		for(int i = 0; i<3; i++) {
+			robot_vel_err.prop_err[i] = loc_vel[i] - robot_vel.actual_v[i];
+			robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i]*dt;
+			robot_vel_err.diff_err[i] = pr_err[i] - robot_vel_err.prop_err[i];
+
+			weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
+			ROS_INFO("target v %f, actual %f",+loc_vel[i], robot_vel.actual_v[i]);
+		}
+
+	}
+	else {
+		for(int i = 0; i<3; i++) {
+
+			robot_vel_err.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];
+			robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i]*dt;
+			robot_vel_err.diff_err[i] = pr_err[i] - robot_vel_err.prop_err[i];
+		
+
+			weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
+			ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
+		}
+	}
+	return;
+}
 void Robot::vel2power(double (&pwr)[4]) {
 	//First new errors are calucalted
 	double old_prop_err[3];
@@ -194,26 +230,18 @@ void Robot::vel2power(double (&pwr)[4]) {
 		}
 		old_prop_err[i] = robot_vel_err.prop_err[i];
 	}
-
-	double weighted_velocities[3];
 	
-	for(int i = 0; i<3; i++) {
-		if(integral_on == 1) {
-			robot_vel_err.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];
-			robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i];
-			robot_vel_err.diff_err[i] = old_prop_err[i] - robot_vel_err.prop_err[i];
-		}
-		else {
-			robot_vel_err.prop_err[i] = 0;
-			robot_vel_err.integ_err[i] = 0;
-			robot_vel_err.diff_err[i] = 0;
-		}
-		weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
-		ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
+	double weighted_vel[3] = {0,0,0};
+	double wheel_s[4] = {0,0,0,0};
+	if (integral_on == 1) {
+		weigh_velocities(weighted_vel, old_prop_err);
+		wheel_speed(wheel_s, weighted_vel);
 	}
-
-	double wheel_s[4];
-	wheel_speed(wheel_s, weighted_velocities);
+	else {
+		for(int i = 0; i<3; i++) {
+			robot_vel_err.integ_err[i]= 0;
+		}
+	}
 
 	for(int i = 0; i<4; i++) {
 		pwr[i] = wheel_s[i]/scaling_factor;		//o.1 pwr -> 120mm/s -> 150mm/s x
@@ -241,6 +269,7 @@ void reconfigure_callback(robot::ReconfigureConfig &config, uint32_t level) {
 }
 
 void twist_callback(const geometry_msgs::Twist &twist) {
+	
 	robot_OBJ.robot_vel.target_v[0] = twist.linear.x;
 	robot_OBJ.robot_vel.target_v[1] = twist.linear.y;
 	robot_OBJ.robot_vel.target_v[2] = twist.angular.z;
@@ -262,18 +291,24 @@ bool KS_rotate_call(robot::coordinate_sys_rotate::Request &req,
 					robot::coordinate_sys_rotate::Response &res) {
 	robot_OBJ.use_global_ks = req.use_global;
 
-	double ch_zero = -robot_OBJ.vel_pose.a_x;
+	double ch_zero = -robot_OBJ.vel_pose.a_z;
 	robot_OBJ.coordinate_ofset = ch_zero + req.KS_ofset;
 	res.success = 1;
 
 	robot_OBJ.vel_pose.x = 0;
 	robot_OBJ.vel_pose.y = 0;
 	robot_OBJ.vel_pose.z = 0;
+	robot_OBJ.vel_pose.a_x = 0;
 	robot_OBJ.vel_pose.a_y = 0;
-	robot_OBJ.vel_pose.a_z = 0;
 	return true;
 }
-
+//Functions
+void rotate_velocities(double angle, double global_vel[3],double (&robot_vel)[3]) {
+	robot_vel[0] = global_vel[0]*cos(angle);
+	robot_vel[1] = global_vel[1]*sin(angle);
+	robot_vel[2] = global_vel[2];
+	return;
+}
 
 //------------------------------------------------------------------------------------------------------------------//
 
@@ -306,6 +341,7 @@ int main(int argc, char** argv) {
 
 	motors_on = nh.advertiseService("/motors_on", motors_on_call);
 	motors_off = nh.advertiseService("/motors_off", motors_off_call);
+	KS_rotate = nh.advertiseService("/KS_rotate", KS_rotate_call);
 
 	if (use_motors == 1)	{
 		ROS_INFO("Initializing motors and encoders");
@@ -363,14 +399,15 @@ int main(int argc, char** argv) {
 
 
 	ros::Rate loop_rate(100);
-	ros::Time current_time, last_time;
-  	current_time = ros::Time::now();
-  	last_time = ros::Time::now();
+	
+  	robot_OBJ.current_time = ros::Time::now();
+  	robot_OBJ.last_time = ros::Time::now();
 
 	Robot_enc_val enc_val_old = {{0,0,0,0},ros::Time::now()};
 	while (ros::ok())
 	{
-		current_time = ros::Time::now();
+		robot_OBJ.last_time = robot_OBJ.current_time;
+		robot_OBJ.current_time = ros::Time::now();
 		if (use_motors) {
 			double motor_power[4] = {0,0,0,0};	//Based on v_x,v_y,a_z set power for each motor
 
@@ -451,8 +488,7 @@ int main(int argc, char** argv) {
 
 		if (use_MPU) {
 			//http://wiki.ros.org/navigation/Tutorials/RobotSetup/Odom
-			current_time = ros::Time::now();
-			double dt = (current_time - last_time).toSec();
+			double dt = (robot_OBJ.current_time - robot_OBJ.last_time).toSec();
 
 			//Calculater move change in x,y coordina. Angle is set based on gyro.
 			robot_OBJ.vel_pose.a_z = robot_OBJ.MPU_data.dmp_TaitBryan[2];
@@ -470,7 +506,7 @@ int main(int argc, char** argv) {
 
 			//Pupulate odom_trans
 			geometry_msgs::TransformStamped odom_trans;
-			odom_trans.header.stamp = current_time;
+			odom_trans.header.stamp = robot_OBJ.current_time;
 			odom_trans.header.frame_id = "global";
 			odom_trans.child_frame_id = "robot";
 
@@ -484,7 +520,7 @@ int main(int argc, char** argv) {
 
 			//next, we'll publish the odometry message over ROS
 			nav_msgs::Odometry odom;
-			odom.header.stamp = current_time;
+			odom.header.stamp = robot_OBJ.current_time;
 			odom.header.frame_id = "global";
 
 			//Set the position
@@ -502,7 +538,6 @@ int main(int argc, char** argv) {
 			//Publish the message
 			odom_pub.publish(odom);
 		}	
-		last_time = ros::Time::now();
 		ros::spinOnce();
 		loop_rate.sleep();
 	}
