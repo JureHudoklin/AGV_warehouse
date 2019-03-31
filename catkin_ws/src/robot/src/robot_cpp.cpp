@@ -2,6 +2,8 @@
 // http://www-ist.massey.ac.nz/conferences/ICARA2004/files/Papers/Paper74_ICARA2004_425_428.pdf
 // export ROS_MASTER_URI=http://192.168.43.179:11311 on BBB 192.168.43.179
 // export ROS_IP=192.168.43.149 on BBB
+//IMU filters
+// extended calman filter
 
 
 
@@ -453,8 +455,8 @@ int main(int argc, char** argv) {
                     rc_gpio_set_value(GP0_2, b);
                     rc_gpio_set_value(GP0_3, c);
 
-                    //ros::Duration(0.0).sleep(); //Sleeps so that multiplexer has time to settle
-					//ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
+                    ros::Duration(0.02).sleep(); //Sleeps so that multiplexer has time to settle
+					ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
 					
 					//ROS_INFO(" %f, %d front", rc_adc_read_volt(3), j);
 					//ros::Duration(0.5).sleep();
@@ -462,12 +464,14 @@ int main(int argc, char** argv) {
                     if (j == 0) {
                         robot_OBJ.line_values_f[i] = rc_adc_read_volt(3);
                         robot_OBJ.line_values_b[i] = rc_adc_read_volt(4);
-						//ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
+						ros::Duration(0.02).sleep();
+						ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
                     }
                     else {
                         robot_OBJ.line_values_f[i] = -rc_adc_read_volt(3)+robot_OBJ.line_values_f[i];
+						ros::Duration(0.02).sleep();
                         robot_OBJ.line_values_b[i] = -rc_adc_read_volt(4)+robot_OBJ.line_values_b[i];
-						//ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
+						ROS_INFO(" %f, %d back", rc_adc_read_volt(4), j);
                     }
                 }
             }
@@ -492,6 +496,7 @@ int main(int argc, char** argv) {
 
 			//Calculater move change in x,y coordina. Angle is set based on gyro.
 			robot_OBJ.vel_pose.a_z = robot_OBJ.MPU_data.dmp_TaitBryan[2];
+			ROS_INFO(" %f", robot_OBJ.vel_pose.a_z);
 			double dh = robot_OBJ.vel_pose.a_z + robot_OBJ.coordinate_ofset;
 			double delta_x = (robot_OBJ.robot_vel.actual_v[0]*cos(dh) - robot_OBJ.robot_vel.actual_v[0]*sin(dh))*dt;
 			double delta_y = (robot_OBJ.robot_vel.actual_v[0]*sin(dh) + robot_OBJ.robot_vel.actual_v[0]*cos(dh))*dt;
