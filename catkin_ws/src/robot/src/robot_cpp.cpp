@@ -2,8 +2,9 @@
 // http://www-ist.massey.ac.nz/conferences/ICARA2004/files/Papers/Paper74_ICARA2004_425_428.pdf
 // export ROS_MASTER_URI=http://192.168.43.179:11311 on BBB 192.168.43.179
 // export ROS_IP=192.168.43.149 on BBB
-//IMU filters
+// IMU filters
 // extended calman filter
+// https://books.google.si/books?id=68RiDwAAQBAJ&pg=PA90&lpg=PA90&dq=ros+set+action+goal+during+execution&source=bl&ots=DyUcfHj9j-&sig=ACfU3U3VQUSoKjwrw1PxcrYYjk_HlbGJ0w&hl=sl&sa=X&ved=2ahUKEwj2jdnk6r3hAhVnxKYKHUKeDMAQ6AEwA3oECAgQAQ#v=onepage&q=ros%20set%20action%20goal%20during%20execution&f=false
 
 
 
@@ -74,7 +75,7 @@ struct Vel_Pose {
 	double x,y,z;
 	double a_x, a_y, a_z;
 };
-void rotate_velocities(double angle, double global_vel[3],double (&robot_vel)[3]);
+
 
 //Publishers
 ros::Publisher odom_pub;
@@ -134,8 +135,8 @@ void Robot::set_scaling(double i) {
 }
 void Robot::dmp_callback(void) {
 	//Add here if any callback is needed after new dmp_data
-			return;
-		}
+	return;
+}
 void Robot::read_encoders(Robot_enc_val &old_val) {
 	//Encoders numbered from front left -> counter cloackwise
 	for (int i = 0; i<4; i++) {
@@ -282,12 +283,6 @@ bool KS_rotate_call(robot::coordinate_sys_rotate::Request &req,
 	return true;
 }
 //Functions
-void rotate_velocities(double angle, double global_vel[3],double (&robot_vel)[3]) {
-	robot_vel[0] = global_vel[0]*cos(angle);
-	robot_vel[1] = global_vel[1]*sin(angle);
-	robot_vel[2] = global_vel[2];
-	return;
-}
 
 //------------------------------------------------------------------------------------------------------------------//
 
