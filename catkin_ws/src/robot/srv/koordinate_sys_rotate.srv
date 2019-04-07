@@ -1,0 +1,4 @@
+float64 KS_offset
+int64 use_global
+---
+int64 success
