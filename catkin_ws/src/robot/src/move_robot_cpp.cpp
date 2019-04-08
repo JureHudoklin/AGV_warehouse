@@ -67,13 +67,13 @@ public:
         double roll, pitch, yaw;
         tf::Matrix3x3 m(q);
         m.getRPY(roll, pitch, yaw);
-        robot_position[1] = yaw;
+        robot_position[2] = yaw;
 
         get_distance();
 
         double gl_vel[3];
-        glob_velocity(vel);
-        rotate_velocities(robot_position[3], vel, &feedback_.velocity);
+        glob_velocity(gl_vel);
+        rotate_velocities(robot_position[3], gl_vel, &feedback_.velocity);
 
         if (distance < 20) {
             for(int i = 0; i < 3; i++) {
