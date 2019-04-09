@@ -186,8 +186,8 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	vy[2] = 0.5 * sqrt(2.)*(-wheel_vel[2]+wheel_vel[3]);
 
 	// Calculated velocities are set for the robot object
-	robot_vel.actual_v[0] = (vx[0]+vx[1]+vx[2]) / 3.;
-	robot_vel.actual_v[1] = (vy[0]+vy[1]+vx[2]) / 3.;
+	robot_vel.actual_v[0] = (vx[0]+vx[1]+vx[2]) / 3.; 
+	robot_vel.actual_v[1] = (vy[0]+vy[1]+vy[2]) / 3.; 
 	return;
 }
 void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
@@ -210,7 +210,7 @@ void Robot::weigh_velocities(double(& weighted_velocities)[3], double pr_err[3])
 	
 
 		weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
-		//ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
+		ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
 	}
 
 	return;
@@ -272,16 +272,18 @@ void twist_callback(const geometry_msgs::Twist &twist) {
 }
 
 // Action callbacks
+/*
 void activeCB() {
 
 }
 void feedbackCB(const robot::MoveRobotFeedbackConstPtr& feedback) {
 
 }
-void doneCB(const acionlib::SimpleClientGoalState& state,
+void doneCB(const actionlib::SimpleClientGoalState& state,
 			const robot::MoveRobotResultConstPtr& result) {
 	
 }
+*/
 
 // Servic callbacks
 bool motors_on_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
@@ -316,10 +318,12 @@ int main(int argc, char** argv) {
 	tf::TransformBroadcaster odom_broadcaster;
 
 	// Create action client
+	/*
 	Client ac("MoveRobot_action", true)
 	ROS_INFO("Waiting for action server to start.");
 	ac.waitForServer();
 	ROS_INFO("Action server started");
+	*/
 
 	// Set node parameters
 	nh.getParam("/robot_node/use_motors", use_motors);
@@ -366,7 +370,7 @@ int main(int argc, char** argv) {
 		MPU_conf.dmp_fetch_accel_gyro = 1;
 		MPU_conf.enable_magnetometer = 1;
 		MPU_conf.compass_time_constant = 25.;
-		MPU_conf.dmp_sample_rate = 100;
+		MPU_conf.dmp_sample_rate = 200;
 		if(rc_mpu_initialize_dmp(&robot_OBJ.MPU_data, MPU_conf) == -1)	{
 			ROS_ERROR_STREAM("MPU initialization unsucessfull");
 		}
@@ -384,7 +388,7 @@ int main(int argc, char** argv) {
 
 
 
-	ros::Rate loop_rate(100);
+	ros::Rate loop_rate(200);
 	
   	robot_OBJ.current_time = ros::Time::now();
   	robot_OBJ.last_time = ros::Time::now();
@@ -438,10 +442,10 @@ int main(int argc, char** argv) {
 			//ROS_INFO(" %f", robot_OBJ.robot_vel.actual_v[1]);
 
 			
-			double dh = robot_OBJ.vel_pose.a_z + robot_OBJ.coordinate_ofset;
-			ROS_INFO(" %f", dh);
+			double dh = robot_OBJ.vel_pose.a_z - robot_OBJ.coordinate_ofset;
+			//ROS_INFO(" %f", dh);
 			double delta_x = (robot_OBJ.robot_vel.actual_v[0]*cos(dh) - robot_OBJ.robot_vel.actual_v[1]*sin(dh))*dt;
-			double delta_y = (robot_OBJ.robot_vel.actual_v[0]*sin(dh) + robot_OBJ.robot_vel.actual_v[1]*cos(dh))*dt;
+			double delta_y = (-robot_OBJ.robot_vel.actual_v[0]*sin(dh) + robot_OBJ.robot_vel.actual_v[1]*cos(dh))*dt;
 
 			geometry_msgs::Quaternion odom_quat;
 			//Save position changes to robot object
