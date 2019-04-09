@@ -33,9 +33,13 @@ Motor: 50:1
 #include <nav_msgs/Odometry.h>
 #include <tf/transform_broadcaster.h>
 
+// Other
 #include <std_srvs/Empty.h>
 #include <dynamic_reconfigure/server.h>
 #include <robot/ReconfigureConfig.h>
+
+#include <actionlib/client/simple_action_client.h>
+#include <robot/MoveRobotAction.h>
 
 #define ANGLE_PER_ENC_PULSE 0.01047197551
 #define WHEEL_DIAMETER 38.1
@@ -87,6 +91,10 @@ ros::Subscriber cmd_vel_sub;
 ros::ServiceServer motors_on; 
 ros::ServiceServer motors_off;
 ros::ServiceServer KS_rotate; 
+
+//Action client
+typedef actionlib::SimpleActionClient<robot::MoveRobotAction> Client; // So it can be initalised later on
+
 
 //Define used variable
 bool motor_state;
@@ -241,7 +249,7 @@ double Robot::coordinate_ofset = 0;
 Robot robot_OBJ;
 
 
-//Callbacks
+// Callbacks
 void reconfigure_callback(robot::ReconfigureConfig &config, uint32_t level) {
 	robot_OBJ.set_PID(config.P_koef, config.I_koef, config.D_koef);
 	robot_OBJ.set_scaling(config.sf);
@@ -263,7 +271,19 @@ void twist_callback(const geometry_msgs::Twist &twist) {
 	return;
 }
 
-//Servic callbacks
+// Action callbacks
+void activeCB() {
+
+}
+void feedbackCB(const robot::MoveRobotFeedbackConstPtr& feedback) {
+
+}
+void doneCB(const acionlib::SimpleClientGoalState& state,
+			const robot::MoveRobotResultConstPtr& result) {
+	
+}
+
+// Servic callbacks
 bool motors_on_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
     motor_state = true;
     return true;
@@ -282,26 +302,31 @@ bool KS_rotate_call(robot::coordinate_sys_rotate::Request &req,
 
 	return true;
 }
-//Functions
+// Functions
 
 //------------------------------------------------------------------------------------------------------------------//
 
 
 int main(int argc, char** argv) {
     
-    //Define and run the node
+    // Define and run the node
 	ros::init(argc, argv, "robot");
 	ros::NodeHandle nh;
 
 	tf::TransformBroadcaster odom_broadcaster;
 
+	// Create action client
+	Client ac("MoveRobot_action", true)
+	ROS_INFO("Waiting for action server to start.");
+	ac.waitForServer();
+	ROS_INFO("Action server started");
 
-	//Set node parameters
+	// Set node parameters
 	nh.getParam("/robot_node/use_motors", use_motors);
 	nh.getParam("/robot_node/use_MPU", use_MPU);
 	nh.getParam("/robot_node/use_TOF", use_TOF);
 
-	//Set dynamic reconfigure
+	// Set dynamic reconfigure
 	dynamic_reconfigure::Server<robot::ReconfigureConfig> server;
 	dynamic_reconfigure::Server<robot::ReconfigureConfig>::CallbackType rec_f;
 	rec_f = boost::bind(&reconfigure_callback, _1, _2);
