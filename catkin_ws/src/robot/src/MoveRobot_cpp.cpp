@@ -31,11 +31,14 @@ public:
 
     void goalCB() {
         // Set goal position
+        boost::shared_ptr<const robot::MoveRobotGoal> goal;
+        
+        goal = as_.acceptNewGoal();
         for(int i = 0; i < 3; i++) {
-            target_position[i] = as_.acceptNewGoal()->target[i];
+            target_position[i] = goal->target[i];
             
         }
-        target_speed = as_.acceptNewGoal()->speed;
+        target_speed =  goal->speed;
     }
 
     void preemptCB() {
@@ -145,7 +148,7 @@ protected:
 
 
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "robot_MoveRobot");
+    ros::init(argc, argv, "robot_MoveRobot_node");
 
     MoveRobotAction moverobot(ros::this_node::getName());
 

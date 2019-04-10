@@ -2,6 +2,8 @@
 // http://www-ist.massey.ac.nz/conferences/ICARA2004/files/Papers/Paper74_ICARA2004_425_428.pdf
 // export ROS_MASTER_URI=http://192.168.43.179:11311 on BBB 192.168.43.179
 // export ROS_IP=192.168.43.149 on BBB
+// scp -r ubuntu@192.168.7.2:~/catkin_ws/src/ /home/jure/jure_ROS/AGV_warehouse/catkin_ws/
+
 // IMU filters
 // extended calman filter
 // https://books.google.si/books?id=68RiDwAAQBAJ&pg=PA90&lpg=PA90&dq=ros+set+action+goal+during+execution&source=bl&ots=DyUcfHj9j-&sig=ACfU3U3VQUSoKjwrw1PxcrYYjk_HlbGJ0w&hl=sl&sa=X&ved=2ahUKEwj2jdnk6r3hAhVnxKYKHUKeDMAQ6AEwA3oECAgQAQ#v=onepage&q=ros%20set%20action%20goal%20during%20execution&f=false
@@ -39,7 +41,9 @@ Motor: 50:1
 #include <robot/ReconfigureConfig.h>
 
 #include <actionlib/client/simple_action_client.h>
+#include <actionlib/client/terminal_state.h>
 #include <robot/MoveRobotAction.h>
+#include <boost/thread.hpp>
 
 #define ANGLE_PER_ENC_PULSE 0.01047197551
 #define WHEEL_DIAMETER 38.1
@@ -92,8 +96,6 @@ ros::ServiceServer motors_on;
 ros::ServiceServer motors_off;
 ros::ServiceServer KS_rotate; 
 
-//Action client
-typedef actionlib::SimpleActionClient<robot::MoveRobotAction> Client; // So it can be initalised later on
 
 
 //Define used variable
@@ -272,18 +274,21 @@ void twist_callback(const geometry_msgs::Twist &twist) {
 }
 
 // Action callbacks
-/*
 void activeCB() {
-
+	// Called once when goal becomes active
+	ROS_INFO("Moving robot to new location");
 }
 void feedbackCB(const robot::MoveRobotFeedbackConstPtr& feedback) {
-
+	for (int i = 0; i<3; i++) {
+		robot_OBJ.robot_vel.target_v[i]= feedback->velocity[i];
+	}
 }
 void doneCB(const actionlib::SimpleClientGoalState& state,
 			const robot::MoveRobotResultConstPtr& result) {
 	
+	ROS_INFO("Finished move");
 }
-*/
+
 
 // Servic callbacks
 bool motors_on_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
@@ -304,6 +309,7 @@ bool KS_rotate_call(robot::coordinate_sys_rotate::Request &req,
 
 	return true;
 }
+
 // Functions
 
 //------------------------------------------------------------------------------------------------------------------//
@@ -317,13 +323,7 @@ int main(int argc, char** argv) {
 
 	tf::TransformBroadcaster odom_broadcaster;
 
-	// Create action client
-	/*
-	Client ac("MoveRobot_action", true)
-	ROS_INFO("Waiting for action server to start.");
-	ac.waitForServer();
-	ROS_INFO("Action server started");
-	*/
+	
 
 	// Set node parameters
 	nh.getParam("/robot_node/use_motors", use_motors);
@@ -385,6 +385,18 @@ int main(int argc, char** argv) {
 		odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 50);
 		rc_mpu_set_dmp_callback(Robot::dmp_callback);
 	}
+
+	// Create action client
+	
+	actionlib::SimpleActionClient<robot::MoveRobotAction> ac("robot_MoveRobot_node");
+	ROS_INFO("Waiting for action server to start.");
+	ac.waitForServer();
+	ROS_INFO("Action server started");
+	robot::MoveRobotGoal goal;
+	goal.speed = 200.;
+	goal.target[0] = 100.;
+	goal.target[1] = 300.;
+	ac.sendGoal(goal);
 
 
 
