@@ -383,7 +383,7 @@ int main(int argc, char** argv) {
 		robot_OBJ.vel_pose.a_z = 0;
 
 
-		odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 50);
+		odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 1);
 		rc_mpu_set_dmp_callback(Robot::dmp_callback);
 	}
 
@@ -397,7 +397,7 @@ int main(int argc, char** argv) {
 	goal.speed = 200.;
 	goal.target[0] = 300.;
 	goal.target[1] = 0.;
-	ac.sendGoal(goal, &doneCB, &activeCB, &feedbackCB);
+	//ac.sendGoal(goal, &doneCB, &activeCB, &feedbackCB);
 
 
 

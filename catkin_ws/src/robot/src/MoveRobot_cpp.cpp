@@ -26,6 +26,7 @@ public:
         
         // Define topics to subscribe to
         odom_sub_ = nh_.subscribe("/odom", 1, &MoveRobotAction::controlCB, this);
+        cmd_vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
         as_.start();
     }
 
@@ -82,21 +83,35 @@ public:
         rotate_velocities(robot_position[2], gl_vel, feedback_);
 
         //ROS_INFO("local vel:  %f, %f", feedback_.velocity[0], feedback_.velocity[1]);
+        vel_feedback_.linear.x = feedback_.velocity[0];
+        vel_feedback_.linear.y = feedback_.velocity[1];
+        vel_feedback_.angular.z = feedback_.velocity[2];
 
-        if (distance < 20 && feedback_.velocity[2] == 0) {
+
+        if (distance < 40 && feedback_.velocity[2] == 0) {
             for(int i = 0; i < 3; i++) {
                 feedback_.velocity[i] = 0;
             }
+            vel_feedback_.linear.x = feedback_.velocity[0];
+            vel_feedback_.linear.y = feedback_.velocity[1];
+            vel_feedback_.angular.z = feedback_.velocity[2];
             as_.publishFeedback(feedback_);
             as_.setSucceeded(result_);
-        } else if(distance < 20) {
+        } else if(distance < 40) {
             for(int i = 0; i < 2; i++) {
                 feedback_.velocity[i] = 0;
             }
+            vel_feedback_.linear.x = feedback_.velocity[0];
+            vel_feedback_.linear.y = feedback_.velocity[1];
+            vel_feedback_.angular.z = feedback_.velocity[2];
             as_.publishFeedback(feedback_);
         } else {
+            vel_feedback_.linear.x = feedback_.velocity[0];
+            vel_feedback_.linear.y = feedback_.velocity[1];
+            vel_feedback_.angular.z = feedback_.velocity[2];
             as_.publishFeedback(feedback_);
         }
+        cmd_vel_pub_.publish(vel_feedback_);
 
     }
 protected:
@@ -110,9 +125,13 @@ protected:
     // Msgs
     robot::MoveRobotFeedback feedback_;
     robot::MoveRobotResult result_;
+    geometry_msgs::Twist vel_feedback_;
 
     // Subs
     ros::Subscriber odom_sub_;
+
+    //Pub
+    ros::Publisher cmd_vel_pub_;
 
     // Ros
     ros::NodeHandle nh_;
