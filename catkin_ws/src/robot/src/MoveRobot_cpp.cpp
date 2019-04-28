@@ -39,6 +39,7 @@ public:
             
         }
         target_speed =  goal->speed;
+        ROS_INFO("position: %f, speed: %f", target_position[0], target_speed);
     }
 
     void preemptCB() {
@@ -62,7 +63,7 @@ public:
 
         // Write recived data to robot_position
         robot_position[0] = msg->pose.pose.position.x;
-        robot_position[1] = msg->pose.pose.position.x;
+        robot_position[1] = msg->pose.pose.position.y;
         tf::Quaternion q(msg->pose.pose.orientation.x,
                          msg->pose.pose.orientation.y,
                          msg->pose.pose.orientation.z,
@@ -71,22 +72,32 @@ public:
         tf::Matrix3x3 m(q);
         m.getRPY(roll, pitch, yaw);
         robot_position[2] = yaw;
+        //ROS_INFO(" %f, %f, %f", robot_position[0], robot_position[1], robot_position[2]);
 
         get_distance();
 
         double gl_vel[3];
         glob_velocity(gl_vel);
-        MoveRobotAction::rotate_velocities(robot_position[3], gl_vel, feedback_);
+        //ROS_INFO("global vel:  %f, %f", gl_vel[0], gl_vel[1]);
+        rotate_velocities(robot_position[2], gl_vel, feedback_);
 
-        if (distance < 20) {
+        //ROS_INFO("local vel:  %f, %f", feedback_.velocity[0], feedback_.velocity[1]);
+
+        if (distance < 20 && feedback_.velocity[2] == 0) {
             for(int i = 0; i < 3; i++) {
                 feedback_.velocity[i] = 0;
             }
             as_.publishFeedback(feedback_);
             as_.setSucceeded(result_);
+        } else if(distance < 20) {
+            for(int i = 0; i < 2; i++) {
+                feedback_.velocity[i] = 0;
+            }
+            as_.publishFeedback(feedback_);
+        } else {
+            as_.publishFeedback(feedback_);
         }
 
-        as_.publishFeedback(feedback_);
     }
 protected:
     // Vars
@@ -124,21 +135,38 @@ protected:
             vel = target_speed;
         }
 
-        angle = atan((target_position[1] - robot_position[1] ) / (target_position[0] - robot_position[0]));
+        double delta_x, delta_y;
+        delta_y = (target_position[1] - robot_position[1]);
+        delta_x = (target_position[0] - robot_position[0]);
+
+        if (delta_x < 1. && delta_x >= 0) {
+            angle = M_PI/2;
+        } else if(delta_x > -1. && delta_x < 0) {
+            angle = -M_PI/2;
+        } else {
+            ROS_INFO("TLE je, %f", delta_x);
+            angle = atan(delta_y / delta_x);
+        }
         
         global_vel[0] = cos(angle)*vel;
         global_vel[1] = sin(angle)*vel;
 
-        if (target_position[2] > robot_position[2]) {
-            global_vel[2] = M_PI_4;
-        } else {
-            global_vel[2] = -M_PI_4;
+        if (target_position[2] - 0.1 > robot_position[2]) {
+            global_vel[2] = M_PI/2;      //TUKAJ DAJ NEK PID KONTROLER ZA HITROST VRTENJA
+        } else if(target_position[2] + 0.1 < robot_position[2]){
+            global_vel[2] = -M_PI/2;
         }
     }
 
-    void rotate_velocities(double angle, double global_vel[3], robot::MoveRobotFeedback &loc_vel) {
+    void rotate_velocities(double angle, double *global_vel, robot::MoveRobotFeedback &loc_vel) {
+        /*
+        Input:  angle -> "Orientation of robot in GCS", 
+                global_vel[3] -> "Required velocities in GCS"
+                loc_vel -> "array where the calculates velocities in LCS will be stored"
+        */
+        
         loc_vel.velocity[0] = cos(angle)* global_vel[0] - sin(angle)* global_vel[1];
-        loc_vel.velocity[1] = sin(angle)* global_vel[1] - cos(angle)* global_vel[0];
+        loc_vel.velocity[1] = -sin(angle)* global_vel[0] + cos(angle)* global_vel[1];
         loc_vel.velocity[2] = global_vel[2];
     }
 

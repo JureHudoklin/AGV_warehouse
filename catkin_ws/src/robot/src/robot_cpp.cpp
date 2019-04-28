@@ -17,8 +17,8 @@ Motor: 50:1
 
 #include <math.h>
 #include <ros/ros.h>
-#include <string>
-#include <vector>
+//#include <string>
+//#include <vector>
 
 #include <robotcontrol.h>
 
@@ -43,7 +43,7 @@ Motor: 50:1
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
 #include <robot/MoveRobotAction.h>
-#include <boost/thread.hpp>
+//#include <boost/thread.hpp>
 
 #define ANGLE_PER_ENC_PULSE 0.01047197551
 #define WHEEL_DIAMETER 38.1
@@ -338,7 +338,7 @@ int main(int argc, char** argv) {
 
     //Start adverstisers, subscribers and services
     //pub = nh.advertise<std_msgs::Int32>("jure_topic", 1000);
-    //sub = nh.subscribe("tema_subscriptiona", 1000, counterCallback); 
+    
 	
 
 	motors_on = nh.advertiseService("/motors_on", motors_on_call);
@@ -347,7 +347,7 @@ int main(int argc, char** argv) {
 
 	if (use_motors == 1)	{
 		ROS_INFO("Initializing motors and encoders");
-		cmd_vel_sub = nh.subscribe("/cmd_vel", 100, &twist_callback); 
+		cmd_vel_sub = nh.subscribe("/cmd_vel", 10, &twist_callback); 
 		if(rc_motor_init() == -1)	{
 			ROS_ERROR_STREAM("Motor initialization unsucessfull");
 		}
@@ -363,6 +363,7 @@ int main(int argc, char** argv) {
 			}	
 		}
 		robot_OBJ.robot_enc_val.timestamp = ros::Time::now();
+		//cmd_vel_sub = nh.subscribe("/cmd_vel", 1, counterCallback); 
 	}
 	if (use_MPU == 1) {
 		ROS_INFO("Initializing MPU");
@@ -394,9 +395,9 @@ int main(int argc, char** argv) {
 	ROS_INFO("Action server started");
 	robot::MoveRobotGoal goal;
 	goal.speed = 200.;
-	goal.target[0] = 100.;
-	goal.target[1] = 300.;
-	ac.sendGoal(goal);
+	goal.target[0] = 300.;
+	goal.target[1] = 0.;
+	ac.sendGoal(goal, &doneCB, &activeCB, &feedbackCB);
 
 
 
@@ -410,6 +411,8 @@ int main(int argc, char** argv) {
 	{
 		robot_OBJ.last_time = robot_OBJ.current_time;
 		robot_OBJ.current_time = ros::Time::now();
+
+		
 		if (use_motors) {
 			double motor_power[4] = {0,0,0,0};	//Based on v_x,v_y,a_z set power for each motor
 
