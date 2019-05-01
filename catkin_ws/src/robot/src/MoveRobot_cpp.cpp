@@ -105,7 +105,7 @@ public:
 
         cmd_vel_pub_.publish(vel_feedback_);
         for (int i = 0; i < 3; i++) {
-            if (i != 0) {
+            if (feedback_.velocity[i] != 0) {
                 as_.publishFeedback(feedback_);
                 return;
             }
@@ -114,33 +114,6 @@ public:
         
         as_.setSucceeded(result_);
 
-
-/*
-        if (distance < 40 && feedback_.velocity[2] == 0) {
-            for(int i = 0; i < 3; i++) {
-                feedback_.velocity[i] = 0;
-            }
-            vel_feedback_.linear.x = feedback_.velocity[0];
-            vel_feedback_.linear.y = feedback_.velocity[1];
-            vel_feedback_.angular.z = feedback_.velocity[2];
-            as_.publishFeedback(feedback_);
-            as_.setSucceeded(result_);
-        } else if(distance < 40) {
-            for(int i = 0; i < 2; i++) {
-                feedback_.velocity[i] = 0;
-            }
-            vel_feedback_.linear.x = feedback_.velocity[0];
-            vel_feedback_.linear.y = feedback_.velocity[1];
-            vel_feedback_.angular.z = feedback_.velocity[2];
-            as_.publishFeedback(feedback_);
-        } else {
-            vel_feedback_.linear.x = feedback_.velocity[0];
-            vel_feedback_.linear.y = feedback_.velocity[1];
-            vel_feedback_.angular.z = feedback_.velocity[2];
-            as_.publishFeedback(feedback_);
-        }
-        cmd_vel_pub_.publish(vel_feedback_);
-        */
 
     }
 protected:
@@ -176,7 +149,7 @@ protected:
     }
 
     void glob_velocity(double *global_vel) {
-        double ZERO_FACTOR = 150.;
+        double ZERO_FACTOR = 100.;
         double P_koef = 1.;
 
         // Velocity for each direction is calculated seperately
@@ -190,7 +163,7 @@ protected:
             if (i < 2) {
 
                 // When robot is within 50mm of target position we stop moving.
-                if (abs(dist) > 50) {
+                if (abs(dist) > 10) {
                     double sign, velocity;
                     sign = getSign<double>(dist);                           // Get sign of distance
                     velocity = ZERO_FACTOR + P_koef*abs(dist);              // Calculate velocity
@@ -203,7 +176,7 @@ protected:
 
             // Similar method for angular velocities -> different coeficients
             } else {
-                if (abs(dist) > 0.2) {
+                if (abs(dist) > 0.05) {
                     double sign, velocity;
                     sign = getSign<double>(dist);
                     velocity = M_PI/8. + P_koef*abs(dist);
@@ -216,36 +189,7 @@ protected:
             }
         }
 
-        /*
-        double vel, angle;
-        if (distance<100) {
-            vel = 200;
-        } else {
-            vel = target_speed;
-        }
-
-        double delta_x, delta_y;
-        delta_y = (target_position[1] - robot_position[1]);
-        delta_x = (target_position[0] - robot_position[0]);
-
-        if (delta_x < 1. && delta_x >= 0) {
-            angle = M_PI/2;
-        } else if(delta_x > -1. && delta_x < 0) {
-            angle = -M_PI/2;
-        } else {
-            ROS_INFO("TLE je, %f", delta_x);
-            angle = atan(delta_y / delta_x);
-        }
         
-        global_vel[0] = cos(angle)*vel;
-        global_vel[1] = sin(angle)*vel;
-
-        if (target_position[2] - 0.1 > robot_position[2]) {
-            global_vel[2] = M_PI/2;      //TUKAJ DAJ NEK PID KONTROLER ZA HITROST VRTENJA
-        } else if(target_position[2] + 0.1 < robot_position[2]){
-            global_vel[2] = -M_PI/2;
-        }
-        */
     }
 
     void rotate_velocities(double angle, double *global_vel, robot::MoveRobotFeedback &loc_vel) {
@@ -254,7 +198,9 @@ protected:
                 global_vel[3] -> "Required velocities in GCS"
                 loc_vel -> "array where the calculates velocities in LCS will be stored"
         */
-        
+        if (global_vel[2] != 0) {
+            angle = angle -getSign<double>(global_vel[2])*0.2;
+        }
         loc_vel.velocity[0] = cos(angle)* global_vel[0] - sin(angle)* global_vel[1];
         loc_vel.velocity[1] = -sin(angle)* global_vel[0] + cos(angle)* global_vel[1];
         loc_vel.velocity[2] = global_vel[2];

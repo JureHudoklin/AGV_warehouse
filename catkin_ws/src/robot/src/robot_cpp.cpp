@@ -175,8 +175,8 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	}
 	
 	/*
-	Robot velocities are calculated from wheel velocities. As the system ofeqations is overdefined,
-	Two pairs of three wheels are used and  velocities from those calculations are averaged.
+	Robot velocities are calculated from wheel velocities. As the system of eqations is overdefined,
+	Three pairs of three wheels are used and  velocities from those calculations are averaged.
 	*/
 	double vx[3];
 	double vy[3];
@@ -214,7 +214,7 @@ void Robot::weigh_velocities(double(& weighted_velocities)[3], double pr_err[3])
 	
 
 		weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
-		ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
+		//ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
 	}
 
 	return;
@@ -271,7 +271,6 @@ void twist_callback(const geometry_msgs::Twist &twist) {
 	robot_OBJ.robot_vel.target_v[0] = twist.linear.x;
 	robot_OBJ.robot_vel.target_v[1] = twist.linear.y;
 	robot_OBJ.robot_vel.target_v[2] = twist.angular.z;
-	ROS_INFO("nove_hitrosti");
 	return;
 }
 
@@ -428,7 +427,7 @@ int main(int argc, char** argv) {
 				for(int i = 0; i<4; i++) {
 					double m;
 					m = motor_power[i];
-					if(m > 0.4 || m<-0.4) {
+					if(m > 0.6 || m<-0.6) {
 						m = 0.;
 						ROS_INFO("wheel %d, power EXCEED", i);
 					}
