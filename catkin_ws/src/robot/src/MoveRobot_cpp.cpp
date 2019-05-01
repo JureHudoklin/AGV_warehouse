@@ -11,7 +11,23 @@
 #include <actionlib/server/simple_action_server.h>
 #include <robot/MoveRobotAction.h>
 
+template <class T>
+T getSign(T number) {
+    if (number < 0) {
+        return -1;
+    } else {
+        return 1;
+    }
+}
 
+template <class T>
+T limitNumber(T number, T max) {
+    if (number < max) {
+        return number;
+    } else {
+        return max;
+    }
+}
 
 class MoveRobotAction {
 public:
@@ -87,7 +103,19 @@ public:
         vel_feedback_.linear.y = feedback_.velocity[1];
         vel_feedback_.angular.z = feedback_.velocity[2];
 
+        cmd_vel_pub_.publish(vel_feedback_);
+        for (int i = 0; i < 3; i++) {
+            if (i != 0) {
+                as_.publishFeedback(feedback_);
+                return;
+            }
+            result_.final_position[i] = robot_position[i];
+        }
+        
+        as_.setSucceeded(result_);
 
+
+/*
         if (distance < 40 && feedback_.velocity[2] == 0) {
             for(int i = 0; i < 3; i++) {
                 feedback_.velocity[i] = 0;
@@ -112,6 +140,7 @@ public:
             as_.publishFeedback(feedback_);
         }
         cmd_vel_pub_.publish(vel_feedback_);
+        */
 
     }
 protected:
@@ -147,6 +176,47 @@ protected:
     }
 
     void glob_velocity(double *global_vel) {
+        double ZERO_FACTOR = 150.;
+        double P_koef = 1.;
+
+        // Velocity for each direction is calculated seperately
+        for(int i = 0; i < 3; i++) {
+            double dist;
+
+            // Calculate distance to target
+            dist = (target_position[i] - robot_position[i]);
+
+            // Linear velocities are handled differently than angular
+            if (i < 2) {
+
+                // When robot is within 50mm of target position we stop moving.
+                if (abs(dist) > 50) {
+                    double sign, velocity;
+                    sign = getSign<double>(dist);                           // Get sign of distance
+                    velocity = ZERO_FACTOR + P_koef*abs(dist);              // Calculate velocity
+                    velocity = limitNumber<float>(velocity, target_speed);  // Limit velocity with target speed
+                    global_vel[i] = sign*velocity;                          // Asign to global_vel
+
+                } else {
+                    global_vel[i] = 0;
+                }
+
+            // Similar method for angular velocities -> different coeficients
+            } else {
+                if (abs(dist) > 0.2) {
+                    double sign, velocity;
+                    sign = getSign<double>(dist);
+                    velocity = M_PI/8. + P_koef*abs(dist);
+                    velocity = limitNumber<float>(velocity, M_PI_2);
+                    global_vel[i] = sign*velocity;
+                } else {
+                    global_vel[i] = 0;
+                }
+
+            }
+        }
+
+        /*
         double vel, angle;
         if (distance<100) {
             vel = 200;
@@ -175,6 +245,7 @@ protected:
         } else if(target_position[2] + 0.1 < robot_position[2]){
             global_vel[2] = -M_PI/2;
         }
+        */
     }
 
     void rotate_velocities(double angle, double *global_vel, robot::MoveRobotFeedback &loc_vel) {

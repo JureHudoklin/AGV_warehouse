@@ -4,6 +4,8 @@
 // export ROS_IP=192.168.43.149 on BBB
 // scp -r ubuntu@192.168.7.2:~/catkin_ws/src/ /home/jure/jure_ROS/AGV_warehouse/catkin_ws/
 
+// scp -r /home/jure/jure_ROS/AGV_warehouse/catkin_ws/src/ ubuntu@192.168.7.2:~/catkin_ws/
+
 // IMU filters
 // extended calman filter
 // https://books.google.si/books?id=68RiDwAAQBAJ&pg=PA90&lpg=PA90&dq=ros+set+action+goal+during+execution&source=bl&ots=DyUcfHj9j-&sig=ACfU3U3VQUSoKjwrw1PxcrYYjk_HlbGJ0w&hl=sl&sa=X&ved=2ahUKEwj2jdnk6r3hAhVnxKYKHUKeDMAQ6AEwA3oECAgQAQ#v=onepage&q=ros%20set%20action%20goal%20during%20execution&f=false

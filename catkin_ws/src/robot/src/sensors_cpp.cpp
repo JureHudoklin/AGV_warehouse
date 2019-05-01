@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
         rc_gpio_init(GP0_3, GPIOHANDLE_REQUEST_OUTPUT); //DIG_1
         rc_gpio_init(GP0_4, GPIOHANDLE_REQUEST_OUTPUT); //DIG_2
 
-        line_sen_pub = nh.advertise<robot::Line_sensor>("/line_sen", 10);
+        line_sen_pub = nh.advertise<robot::Line_sensor>("/line_sen", 1);
     }
     if (use_TOF) {
         ROS_INFO("Initializing TOF sensor");
