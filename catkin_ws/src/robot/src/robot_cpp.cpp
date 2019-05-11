@@ -67,10 +67,10 @@ struct Robot_vel_state {
     double target_v[3]; //Is set based on the Koordinate system used (global or robot)
 	double actual_v[3]; //Is always the velocity in robot KS
 };
-struct Robot_vel_err {
-	double prop_err[3];
-	double integ_err[3];
-	double diff_err[3];
+struct PID_state {
+	double u[3];
+	double error_1[3];
+	double error_2[3];
 };
 struct Robot_enc_val {
 	int enc[4];
@@ -80,6 +80,7 @@ struct PID_koef {
 	double P;
 	double I;
 	double D;
+	double FF;
 };
 struct Vel_Pose {
 	double x,y,z;
@@ -112,7 +113,7 @@ double power_on_wheel =0.;
 //Classes
 class Robot {
 	private:
-		Robot_vel_err robot_vel_err;
+		PID_state PID_StateHistory;
 		PID_koef PID;
 		double scaling_factor;
 	public:
@@ -131,14 +132,15 @@ class Robot {
 		static void dmp_callback(void);
 		void read_encoders(Robot_enc_val &old_val);
 		void calc_velocities(Robot_enc_val &old_val);
-		void weigh_velocities(double(& weighted_velocities)[3], double pr_err[3]);
+		void weigh_velocities(double(& weighted_velocities)[3]);
 		void vel2power(double (&pwr)[4]);
 		void wheel_speed(double (&ws)[4] ,double velocities[3]);
 };
-void Robot::set_PID(double p, double i, double d) {
+void Robot::set_PID(double p, double i, double d, double ff) {
 	PID.P = p;
 	PID.I = i;
 	PID.D = d;
+	PID.FF = ff;
 	return;
 }
 void Robot::set_scaling(double i) {
@@ -203,44 +205,57 @@ void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
 	}
 	return;
 }
-void Robot::weigh_velocities(double(& weighted_velocities)[3], double pr_err[3]) {
+void Robot::weigh_velocities(double(& weighted_velocities)[3]) {
 	double dt = current_time.toSec()-last_time.toSec();
 
 	for(int i = 0; i<3; i++) {
+		double error, du;
 
-		robot_vel_err.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];
-		robot_vel_err.integ_err[i] = robot_vel_err.integ_err[i] + robot_vel_err.prop_err[i]*dt;
-		robot_vel_err.diff_err[i] = pr_err[i] - robot_vel_err.prop_err[i];
+		error = robot_vel.target_v[i] - robot_vel.actual_v[i];
+
+		du += PID.P * error-PID_StateHistory.error_1[i];
+		du += PID.I * error * dt; 
+		du += PID.D * (error - 2*PID_StateHistory.error_1[i] + 2*PID_StateHistory.error_2[i]);
+
+		PID_StateHistory.u[i] += du;
+		weighted_velocities[i] = PID_StateHistory.u[i] + PID.FF * robot_vel.target_v[i];
+	
+		PID_StateHistory.error_2[i] = PID_StateHistory.error_1[i];
+		PID_StateHistory.error_1[i] = error;
+		
+	}
+	/*
+	for(int i = 0; i<3; i++) {
+
+		PID_StateHistory.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];
+		PID_StateHistory.integ_err[i] = PID_StateHistory.integ_err[i] + PID_StateHistory.prop_err[i]*dt;
+		PID_StateHistory.diff_err[i] = pr_err[i] - PID_StateHistory.prop_err[i];
 	
 
-		weighted_velocities[i] = PID.P * robot_vel_err.prop_err[i] + PID.I * robot_vel_err.integ_err[i] + PID.D * robot_vel_err.diff_err[i];
+		weighted_velocities[i] = PID.P * PID_StateHistory.prop_err[i] + PID.I * PID_StateHistory.integ_err[i] + PID.D * PID_StateHistory.diff_err[i];
 		//ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
 	}
-
+	*/
 	return;
 }
 void Robot::vel2power(double (&pwr)[4]) {
 	//First new errors are calucalted
-	double old_prop_err[3];
 	int integral_on = 0;
+
 	for(int i = 0; i<3; i++) {
 		if(robot_vel.target_v[i] != 0) {
 			integral_on = 1;
 		}
-		old_prop_err[i] = robot_vel_err.prop_err[i];
 	}
 	
 	double weighted_vel[3] = {0,0,0};
 	double wheel_s[4] = {0,0,0,0};
+
 	if (integral_on == 1) {
-		weigh_velocities(weighted_vel, old_prop_err);
+		weigh_velocities(weighted_vel);
 		wheel_speed(wheel_s, weighted_vel);
 	}
-	else {
-		for(int i = 0; i<3; i++) {
-			robot_vel_err.integ_err[i]= 0;
-		}
-	}
+	
 
 	for(int i = 0; i<4; i++) {
 		pwr[i] = wheel_s[i]/scaling_factor;		//o.1 pwr -> 120mm/s -> 150mm/s x
@@ -255,7 +270,7 @@ Robot robot_OBJ;
 
 // Callbacks
 void reconfigure_callback(robot::ReconfigureConfig &config, uint32_t level) {
-	robot_OBJ.set_PID(config.P_koef, config.I_koef, config.D_koef);
+	robot_OBJ.set_PID(config.P_koef, config.I_koef, config.D_koef, config.FF_koef);
 	robot_OBJ.set_scaling(config.sf);
 	robot_OBJ.robot_vel.target_v[0] = config.x;
 	robot_OBJ.robot_vel.target_v[1] = config.y;

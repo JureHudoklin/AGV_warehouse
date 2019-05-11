@@ -1,5 +1,5 @@
 EESchema Schematic File Version 4
-LIBS:agv-skladiscni-v1-cache
+LIBS:agv-skladiscni-v5-cache
 EELAYER 26 0
 EELAYER END
 $Descr A4 11693 8268
@@ -1456,7 +1456,7 @@ Wire Wire Line
 Wire Wire Line
 	9000 2150 8950 2150
 $Comp
-L agv-skladiscni-v1-rescue:NLAST4051DTR2G-NLAST4051DTR2G IC1
+L agv-skladiscni-v5-rescue:NLAST4051DTR2G-NLAST4051DTR2G-agv-skladiscni-v1-rescue IC1
 U 1 1 5BECC76D
 P 8600 3200
 F 0 "IC1" H 9250 3465 50  0000 C CNN
@@ -1578,7 +1578,7 @@ Wire Wire Line
 Wire Wire Line
 	10000 3800 9900 3800
 $Comp
-L agv-skladiscni-v1-rescue:NLAST4051DTR2G-NLAST4051DTR2G IC2
+L agv-skladiscni-v5-rescue:NLAST4051DTR2G-NLAST4051DTR2G-agv-skladiscni-v1-rescue IC2
 U 1 1 5C03A0C5
 P 8600 4750
 F 0 "IC2" H 9250 5015 50  0000 C CNN

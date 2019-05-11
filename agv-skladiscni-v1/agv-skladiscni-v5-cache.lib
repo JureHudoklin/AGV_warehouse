@@ -1,11 +1,11 @@
 EESchema-LIBRARY Version 2.4
 #encoding utf-8
 #
-# Connector:Conn_01x04_Male
+# Connector_Conn_01x04_Male
 #
-DEF Connector:Conn_01x04_Male J 0 40 Y N 1 F N
+DEF Connector_Conn_01x04_Male J 0 40 Y N 1 F N
 F0 "J" 0 200 50 H V C CNN
-F1 "Connector:Conn_01x04_Male" 0 -300 50 H V C CNN
+F1 "Connector_Conn_01x04_Male" 0 -300 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
 F3 "" 0 0 50 H I C CNN
 $FPLIST
@@ -27,11 +27,11 @@ X Pin_4 4 200 -200 150 L 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# Connector:Conn_01x05_Female
+# Connector_Conn_01x05_Female
 #
-DEF Connector:Conn_01x05_Female J 0 40 Y N 1 F N
+DEF Connector_Conn_01x05_Female J 0 40 Y N 1 F N
 F0 "J" 0 300 50 H V C CNN
-F1 "Connector:Conn_01x05_Female" 0 -300 50 H V C CNN
+F1 "Connector_Conn_01x05_Female" 0 -300 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
 F3 "" 0 0 50 H I C CNN
 $FPLIST
@@ -56,11 +56,11 @@ X Pin_5 5 -200 -200 150 R 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# Connector:Conn_01x06_Male
+# Connector_Conn_01x06_Male
 #
-DEF Connector:Conn_01x06_Male J 0 40 Y N 1 F N
+DEF Connector_Conn_01x06_Male J 0 40 Y N 1 F N
 F0 "J" 0 300 50 H V C CNN
-F1 "Connector:Conn_01x06_Male" 0 -400 50 H V C CNN
+F1 "Connector_Conn_01x06_Male" 0 -400 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
 F3 "" 0 0 50 H I C CNN
 $FPLIST
@@ -88,11 +88,11 @@ X Pin_6 6 200 -300 150 L 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# Device:R
+# Device_R
 #
-DEF Device:R R 0 0 N Y 1 F N
+DEF Device_R R 0 0 N Y 1 F N
 F0 "R" 80 0 50 V V C CNN
-F1 "Device:R" 0 0 50 V V C CNN
+F1 "Device_R" 0 0 50 V V C CNN
 F2 "" -70 0 50 V I C CNN
 F3 "" 0 0 50 H I C CNN
 $FPLIST
@@ -105,11 +105,11 @@ X ~ 2 0 -150 50 U 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# Sensor_Proximity:QRE1113GR
+# Sensor_Proximity_QRE1113GR
 #
-DEF Sensor_Proximity:QRE1113GR U 0 1 Y N 1 F N
+DEF Sensor_Proximity_QRE1113GR U 0 1 Y N 1 F N
 F0 "U" -150 200 50 H V C CNN
-F1 "Sensor_Proximity:QRE1113GR" 500 200 50 H V R CNN
+F1 "Sensor_Proximity_QRE1113GR" 500 200 50 H V R CNN
 F2 "OptoDevice:Everlight_ITR8307F43" 0 -200 50 H I C CNN
 F3 "" 0 100 50 H I C CNN
 ALIAS BPR-105F QRE1113GR
@@ -151,11 +151,11 @@ X E 4 300 -100 100 L 50 50 1 1 E
 ENDDRAW
 ENDDEF
 #
-# Transistor_FET:BSS138
+# Transistor_FET_BSS138
 #
-DEF Transistor_FET:BSS138 Q 0 0 Y N 1 F N
+DEF Transistor_FET_BSS138 Q 0 0 Y N 1 F N
 F0 "Q" 200 75 50 H V L CNN
-F1 "Transistor_FET:BSS138" 200 0 50 H V L CNN
+F1 "Transistor_FET_BSS138" 200 0 50 H V L CNN
 F2 "Package_TO_SOT_SMD:SOT-23" 200 -75 50 H I L CIN
 F3 "" 0 0 50 H I L CNN
 ALIAS 2N7002 MMBF170
@@ -186,11 +186,11 @@ X D 3 100 200 100 D 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# agv-skladiscni-v1-rescue:NLAST4051DTR2G-NLAST4051DTR2G
+# agv-skladiscni-v5-rescue_NLAST4051DTR2G-NLAST4051DTR2G-agv-skladiscni-v1-rescue
 #
-DEF agv-skladiscni-v1-rescue:NLAST4051DTR2G-NLAST4051DTR2G IC 0 30 Y Y 1 F N
+DEF agv-skladiscni-v5-rescue_NLAST4051DTR2G-NLAST4051DTR2G-agv-skladiscni-v1-rescue IC 0 30 Y Y 1 F N
 F0 "IC" 1150 300 50 H V L CNN
-F1 "agv-skladiscni-v1-rescue:NLAST4051DTR2G-NLAST4051DTR2G" 1150 200 50 H V L CNN
+F1 "agv-skladiscni-v5-rescue_NLAST4051DTR2G-NLAST4051DTR2G-agv-skladiscni-v1-rescue" 1150 200 50 H V L CNN
 F2 "SOP65P640X120-16N" 1150 100 50 H I L CNN
 F3 "http://www.onsemi.com/pub/Collateral/NLAST4051-D.PDF" 1150 0 50 H I L CNN
 F4 "Analog Multiplexer/Demultiplexer" 1150 -100 50 H I L CNN "Description"
@@ -224,11 +224,11 @@ X ADDA 9 1300 -700 200 L 50 50 0 0 B
 ENDDRAW
 ENDDEF
 #
-# power:+1V8
+# power_+1V8
 #
-DEF power:+1V8 #PWR 0 0 Y Y 1 F P
+DEF power_+1V8 #PWR 0 0 Y Y 1 F P
 F0 "#PWR" 0 -150 50 H I C CNN
-F1 "power:+1V8" 0 140 50 H V C CNN
+F1 "power_+1V8" 0 140 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
 F3 "" 0 0 50 H I C CNN
 DRAW
@@ -239,11 +239,11 @@ X +1V8 1 0 0 0 U 50 50 1 1 W N
 ENDDRAW
 ENDDEF
 #
-# power:+3.3V
+# power_+3.3V
 #
-DEF power:+3.3V #PWR 0 0 Y Y 1 F P
+DEF power_+3.3V #PWR 0 0 Y Y 1 F P
 F0 "#PWR" 0 -150 50 H I C CNN
-F1 "power:+3.3V" 0 140 50 H V C CNN
+F1 "power_+3.3V" 0 140 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
 F3 "" 0 0 50 H I C CNN
 ALIAS +3.3V
@@ -255,11 +255,11 @@ X +3V3 1 0 0 0 U 50 50 1 1 W N
 ENDDRAW
 ENDDEF
 #
-# power:GND
+# power_GND
 #
-DEF power:GND #PWR 0 0 Y Y 1 F P
+DEF power_GND #PWR 0 0 Y Y 1 F P
 F0 "#PWR" 0 -250 50 H I C CNN
-F1 "power:GND" 0 -150 50 H V C CNN
+F1 "power_GND" 0 -150 50 H V C CNN
 F2 "" 0 0 50 H I C CNN
 F3 "" 0 0 50 H I C CNN
 DRAW
