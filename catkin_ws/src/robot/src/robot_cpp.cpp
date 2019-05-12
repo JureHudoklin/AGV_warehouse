@@ -68,9 +68,9 @@ struct Robot_vel_state {
 	double actual_v[3]; //Is always the velocity in robot KS
 };
 struct PID_state {
-	double u[3];
-	double error_1[3];
-	double error_2[3];
+	double u[3] = {0,0,0};
+	double error_1[3] = {0,0,0} ;
+	double error_2[3] = {0,0,0};
 };
 struct Robot_enc_val {
 	int enc[4];
@@ -127,7 +127,7 @@ class Robot {
 		Robot_enc_val robot_enc_val;
 		Vel_Pose vel_pose;
 		//Methods
-		void set_PID(double p, double i, double d);
+		void set_PID(double p, double i, double d, double ff);
 		void set_scaling(double i);
 		static void dmp_callback(void);
 		void read_encoders(Robot_enc_val &old_val);
@@ -194,6 +194,8 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	// Calculated velocities are set for the robot object
 	robot_vel.actual_v[0] = (vx[0]+vx[1]+vx[2]) / 3.; 
 	robot_vel.actual_v[1] = (vy[0]+vy[1]+vy[2]) / 3.; 
+	//ROS_INFO("robot_vel x: %f", robot_vel.actual_v[0]);
+	//ROS_INFO("robot_vel y: %f", robot_vel.actual_v[1]);
 	return;
 }
 void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
@@ -210,36 +212,37 @@ void Robot::weigh_velocities(double(& weighted_velocities)[3]) {
 
 	for(int i = 0; i<3; i++) {
 		double error, du;
-
+		du = 0;
 		error = robot_vel.target_v[i] - robot_vel.actual_v[i];
 
-		du += PID.P * error-PID_StateHistory.error_1[i];
+		du += PID.P * (error - PID_StateHistory.error_1[i]);
 		du += PID.I * error * dt; 
-		du += PID.D * (error - 2*PID_StateHistory.error_1[i] + 2*PID_StateHistory.error_2[i]);
+		du += PID.D * (error - 2*PID_StateHistory.error_1[i] + 1*PID_StateHistory.error_2[i])/dt;
 
 		PID_StateHistory.u[i] += du;
+
 		weighted_velocities[i] = PID_StateHistory.u[i] + PID.FF * robot_vel.target_v[i];
+
+		if (PID_StateHistory.u[i] > 1200) {
+			for (int i = 0; i<3; i++) {
+				PID_StateHistory.u[i] = 0;
+				PID_StateHistory.error_1[i] = 0;
+				PID_StateHistory.error_2[i] = 0;
+				robot_vel.target_v[i] = 0;
+				ROS_INFO("Control velocity error. Velocity set to 0");
+			}	
+
+			return;
+		}
 	
 		PID_StateHistory.error_2[i] = PID_StateHistory.error_1[i];
 		PID_StateHistory.error_1[i] = error;
 		
 	}
-	/*
-	for(int i = 0; i<3; i++) {
-
-		PID_StateHistory.prop_err[i] = robot_vel.target_v[i] - robot_vel.actual_v[i];
-		PID_StateHistory.integ_err[i] = PID_StateHistory.integ_err[i] + PID_StateHistory.prop_err[i]*dt;
-		PID_StateHistory.diff_err[i] = pr_err[i] - PID_StateHistory.prop_err[i];
-	
-
-		weighted_velocities[i] = PID.P * PID_StateHistory.prop_err[i] + PID.I * PID_StateHistory.integ_err[i] + PID.D * PID_StateHistory.diff_err[i];
-		//ROS_INFO("target v %f, actual %f",robot_vel.target_v[i], robot_vel.actual_v[i]);
-	}
-	*/
 	return;
 }
 void Robot::vel2power(double (&pwr)[4]) {
-	//First new errors are calucalted
+	// We check wheather any velocities are set, if yes integral_on = 1;
 	int integral_on = 0;
 
 	for(int i = 0; i<3; i++) {
@@ -248,15 +251,25 @@ void Robot::vel2power(double (&pwr)[4]) {
 		}
 	}
 	
+	// Two tables are created one will be set with calculated velocities form PID and other with wheel speeds
+	// basedon these velocities.
 	double weighted_vel[3] = {0,0,0};
 	double wheel_s[4] = {0,0,0,0};
 
+	// If velocities are set calculate new values else just pass 0 to output
 	if (integral_on == 1) {
 		weigh_velocities(weighted_vel);
 		wheel_speed(wheel_s, weighted_vel);
 	}
-	
+	else {
+		for (int i = 0; i<3; i++) {
+			PID_StateHistory.u[i] = 0;
+			PID_StateHistory.error_1[i] = 0;
+			PID_StateHistory.error_2[i] = 0;
+		}
+	}
 
+	// Set power for each wheel
 	for(int i = 0; i<4; i++) {
 		pwr[i] = wheel_s[i]/scaling_factor;		//o.1 pwr -> 120mm/s -> 150mm/s x
 		//ROS_INFO("wheel speed: %f", wheel_s[i]);
@@ -270,7 +283,11 @@ Robot robot_OBJ;
 
 // Callbacks
 void reconfigure_callback(robot::ReconfigureConfig &config, uint32_t level) {
+
+	// Set PID levels to those from reconfigure call
 	robot_OBJ.set_PID(config.P_koef, config.I_koef, config.D_koef, config.FF_koef);
+
+	// Set target velocities to those from reconfigure call
 	robot_OBJ.set_scaling(config.sf);
 	robot_OBJ.robot_vel.target_v[0] = config.x;
 	robot_OBJ.robot_vel.target_v[1] = config.y;
@@ -282,7 +299,7 @@ void reconfigure_callback(robot::ReconfigureConfig &config, uint32_t level) {
 }
 
 void twist_callback(const geometry_msgs::Twist &twist) {
-	
+	// Update target velocities for the robot
 	robot_OBJ.robot_vel.target_v[0] = twist.linear.x;
 	robot_OBJ.robot_vel.target_v[1] = twist.linear.y;
 	robot_OBJ.robot_vel.target_v[2] = twist.angular.z;
