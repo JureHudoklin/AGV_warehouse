@@ -27,10 +27,10 @@
 #define DEGREE2RADIANS 0.01745329252
 
 //GPIO setup
-#define GP0_4 3, 17
-#define GP0_3 3, 20
-#define GP0_2 1, 17
-#define GP0_1 1, 25
+#define GP0_1 3, 17 //LED_S
+#define GP0_2 3, 20 //DIG 2
+#define GP0_3 1, 17 //DIG 1
+#define GP0_4 1, 25 //DIG 0
 
 #define GP1_4 2, 3
 #define GP1_3 2, 2
@@ -58,9 +58,9 @@ int main(int argc, char** argv) {
 		ROS_INFO("Initializing line senzors");
         rc_adc_init();
         rc_gpio_init(GP0_1, GPIOHANDLE_REQUEST_OUTPUT); //LED_S
-        rc_gpio_init(GP0_2, GPIOHANDLE_REQUEST_OUTPUT); //DIG_0
+        rc_gpio_init(GP0_2, GPIOHANDLE_REQUEST_OUTPUT); //DIG_2
         rc_gpio_init(GP0_3, GPIOHANDLE_REQUEST_OUTPUT); //DIG_1
-        rc_gpio_init(GP0_4, GPIOHANDLE_REQUEST_OUTPUT); //DIG_2
+        rc_gpio_init(GP0_4, GPIOHANDLE_REQUEST_OUTPUT); //DIG_0
 
         line_sen_pub = nh.advertise<robot::Line_sensor>("/line_sen", 1);
     }
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
             robot::Line_sensor line_sen_msg;
 
             for(int j = 0; j<2; j++) {
-                rc_gpio_set_value(GP0_4, j);
+                rc_gpio_set_value(GP0_1, j); //LED_S
                 ros::Duration(0.02).sleep();
 
 
@@ -121,19 +121,21 @@ int main(int argc, char** argv) {
                     a = i & 0b001;
                     b = i & 0b010;
                     c = i & 0b100;
-                    rc_gpio_set_value(GP0_1, a);
-                    rc_gpio_set_value(GP0_2, b);
-                    rc_gpio_set_value(GP0_3, c);
+                    rc_gpio_set_value(GP0_4, a);    //DIG_0
+                    rc_gpio_set_value(GP0_3, b);    //DIG_1
+                    rc_gpio_set_value(GP0_2, c);    //DIG_2
 
-                    ros::Duration(0.001).sleep(); //Sleeps so that multiplexer has time to settle
+                    ros::Duration(0.005).sleep(); //Sleeps so that multiplexer has time to settle
 
                     if (j == 0) {
-                        line_values_f[i] = rc_adc_read_volt(3);
-                        line_values_b[i] = rc_adc_read_volt(4);
+                        line_values_f[i] = rc_adc_read_volt(1);
+                        ros::Duration(0.005).sleep();
+                        line_values_b[i] = rc_adc_read_volt(3);
                     }
                     else {
-                        line_values_f[i] = -rc_adc_read_volt(3)+line_values_f[i];
-                        line_values_b[i] = -rc_adc_read_volt(4)+line_values_b[i];
+                        line_values_f[i] = -rc_adc_read_volt(1)+line_values_f[i];
+                        ros::Duration(0.005).sleep();
+                        line_values_b[i] = -rc_adc_read_volt(3)+line_values_b[i];
                     }
                 }
             }
