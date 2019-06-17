@@ -1,0 +1,10 @@
+# http://wiki.ros.org/actionlib_tutorials/Tutorials/SimpleActionServer%28GoalCallbackMethod%29
+# goal definition
+float32[2] target_square
+float64 speed
+---
+# result definition
+int32 succeded
+---
+# feedback
+int32[2] current_square
