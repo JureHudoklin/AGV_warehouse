@@ -72,39 +72,12 @@ int main(int argc, char** argv) {
     ros::Time current_time, last_time;
     current_time = ros::Time::now();
     last_time = ros::Time::now();
-    ros::Rate loop_rate(10);
+    ros::Rate loop_rate(30);
 
     while (ros::ok())
 	{
         last_time = current_time;
         current_time = ros::Time::now();
-
-        /*   IZBRISI POTEM KO BO DELOVALO BRANJE CRTE ------------------------------------!!!!!!
-        while(1) {
-            rc_gpio_set_value(GP0_4, 1);
-            ros::Duration(2).sleep();
-            rc_gpio_set_value(GP0_4, 0);
-            ros::Duration(2).sleep();
-        }
-        
-        while(1) {
-            for(int i = 0; i<8; i++) {
-                    int a, b, c;
-                    a = i & 0b001;
-                    b = (i & 0b010)>>1;
-                    c = (i & 0b100)>>1;
-                    ROS_INFO(" a = %d, b = %d, c = %d ", a,b,c);
-                    rc_gpio_set_value(GP0_1, a);
-                    rc_gpio_set_value(GP0_2, b);
-                    rc_gpio_set_value(GP0_3, c);
-                    rc_gpio_set_value(GP0_4, a);
-                    ros::Duration(4).sleep();
-                    ROS_INFO(" %f", rc_adc_read_volt(4));
-                    ROS_INFO(" %f", rc_adc_read_volt(3));
-            }
-        }
-        */
-        
         
         if (use_line) {
             double line_values_f[8];
@@ -113,7 +86,7 @@ int main(int argc, char** argv) {
 
             for(int j = 0; j<2; j++) {
                 rc_gpio_set_value(GP0_1, j); //LED_S
-                ros::Duration(0.02).sleep();
+                ros::Duration(0.001).sleep();
 
 
                 for(int i = 0; i<8; i++) {
@@ -125,16 +98,16 @@ int main(int argc, char** argv) {
                     rc_gpio_set_value(GP0_3, b);    //DIG_1
                     rc_gpio_set_value(GP0_2, c);    //DIG_2
 
-                    ros::Duration(0.005).sleep(); //Sleeps so that multiplexer has time to settle
+                    ros::Duration(0.001).sleep(); //Sleeps so that multiplexer has time to settle
 
                     if (j == 0) {
                         line_values_f[i] = rc_adc_read_volt(1);
-                        ros::Duration(0.005).sleep();
+                        //ros::Duration(0.005).sleep();
                         line_values_b[i] = rc_adc_read_volt(3);
                     }
                     else {
                         line_values_f[i] = -rc_adc_read_volt(1)+line_values_f[i];
-                        ros::Duration(0.005).sleep();
+                        //ros::Duration(0.005).sleep();
                         line_values_b[i] = -rc_adc_read_volt(3)+line_values_b[i];
                     }
                 }

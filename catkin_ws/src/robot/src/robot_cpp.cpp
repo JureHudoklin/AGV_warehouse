@@ -45,6 +45,7 @@ Motor: 50:1
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/client/terminal_state.h>
 #include <robot/MoveRobotAction.h>
+#include <robot/FollowLineAction.h>
 //#include <boost/thread.hpp>
 
 #define ANGLE_PER_ENC_PULSE 0.01047197551
@@ -69,8 +70,7 @@ struct Robot_vel_state {
 };
 struct PID_state {
 	double u[3] = {0,0,0};
-	double error_1[3] = {0,0,0} ;
-	double error_2[3] = {0,0,0};
+	double error_1[3] = {0,0,0};
 };
 struct Robot_enc_val {
 	int enc[4];
@@ -97,12 +97,15 @@ ros::Subscriber cmd_vel_sub;
 //Services
 ros::ServiceServer motors_on; 
 ros::ServiceServer motors_off;
+ros::ServiceServer follow_line_on;
+ros::ServiceServer follow_line_off;
 ros::ServiceServer KS_rotate; 
 
 
 
 //Define used variable
 bool motor_state;
+int follow_line = 2;
 int use_motors, use_MPU, use_TOF;
 
 //--------------------------TEST_--------------
@@ -194,8 +197,8 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	// Calculated velocities are set for the robot object
 	robot_vel.actual_v[0] = (vx[0]+vx[1]+vx[2]) / 3.; 
 	robot_vel.actual_v[1] = (vy[0]+vy[1]+vy[2]) / 3.; 
-	//ROS_INFO("robot_vel x: %f", robot_vel.actual_v[0]);
-	//ROS_INFO("robot_vel y: %f", robot_vel.actual_v[1]);
+	//ROS_INFO("robot_vel z: %f , target %f", robot_vel.actual_v[2], robot_vel.target_v[2]);
+	//ROS_INFO("robot_vel y: %f, target %f", robot_vel.actual_v[1], robot_vel.target_v[1]);
 	return;
 }
 void Robot::wheel_speed(double (&ws)[4], double velocities[3]) {
@@ -212,30 +215,56 @@ void Robot::weigh_velocities(double(& weighted_velocities)[3]) {
 
 	for(int i = 0; i<3; i++) {
 		double error, du;
+		double P_, I_, D_;
 		du = 0;
 		error = robot_vel.target_v[i] - robot_vel.actual_v[i];
 
-		du += PID.P * (error - PID_StateHistory.error_1[i]);
-		du += PID.I * error * dt; 
-		du += PID.D * (error - 2*PID_StateHistory.error_1[i] + 1*PID_StateHistory.error_2[i])/dt;
+		P_ = PID.P * error;
+		PID_StateHistory.u[i] += error*dt; 
+		//ROS_INFO("error %f, error*dt %f", error, error*dt);
+		//ROS_INFO("PID_StateHistory %f", PID_StateHistory.u[i]);
+		
+		if (PID_StateHistory.u[i]>200.) {
+			ROS_INFO("Prsu je sm notr 0");
+			PID_StateHistory.u[i] = 200;
+		} else if(PID_StateHistory.u[i]<-200.) {
+			PID_StateHistory.u[i] = -200;
+		}
+		
 
-		PID_StateHistory.u[i] += du;
+		if (PID_StateHistory.u[2]>10.) {
+			ROS_INFO("Prsu je sm notr");
+			PID_StateHistory.u[2] = 10.;
+		} else if(PID_StateHistory.u[2]<-10.) {
+			ROS_INFO("Prsu je sm notr 1");
+			PID_StateHistory.u[2] = -10.;
+		}
 
-		weighted_velocities[i] = PID_StateHistory.u[i] + PID.FF * robot_vel.target_v[i];
 
-		if (PID_StateHistory.u[i] > 1200) {
+		I_ = PID.I * PID_StateHistory.u[i];
+		
+		D_ = PID.D *(error-PID_StateHistory.error_1[i]);
+
+
+		weighted_velocities[i] = P_ + I_ + D_;
+		if(i == 2) {
+			weighted_velocities[i] = P_ + I_ + D_; // POPRAVI POL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			//ROS_INFO("utezena kotna %f", weighted_velocities[2]);
+		}
+
+		if (weighted_velocities[i] > 1200) {
 			for (int i = 0; i<3; i++) {
 				PID_StateHistory.u[i] = 0;
 				PID_StateHistory.error_1[i] = 0;
-				PID_StateHistory.error_2[i] = 0;
+				weighted_velocities[i] = 0;
 				robot_vel.target_v[i] = 0;
 				ROS_INFO("Control velocity error. Velocity set to 0");
+				ROS_INFO("P %f, I %f, D %f", P_, I_, D_);
 			}	
 
 			return;
 		}
 	
-		PID_StateHistory.error_2[i] = PID_StateHistory.error_1[i];
 		PID_StateHistory.error_1[i] = error;
 		
 	}
@@ -265,7 +294,6 @@ void Robot::vel2power(double (&pwr)[4]) {
 		for (int i = 0; i<3; i++) {
 			PID_StateHistory.u[i] = 0;
 			PID_StateHistory.error_1[i] = 0;
-			PID_StateHistory.error_2[i] = 0;
 		}
 	}
 
@@ -322,6 +350,18 @@ void doneCB(const actionlib::SimpleClientGoalState& state,
 	ROS_INFO("Finished move");
 }
 
+void FollowLineActiveCB() {
+	// Called once when goal becomes active
+	ROS_INFO("Moving robot to new location");
+}
+void FollowLineFeedbackCB(const robot::FollowLineFeedbackConstPtr& feedback) {
+	
+}
+void FollowLineDoneCB(const actionlib::SimpleClientGoalState& state,
+			const robot::FollowLineResultConstPtr& result) {
+	
+	ROS_INFO("Finished move");
+}
 
 // Servic callbacks
 bool motors_on_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
@@ -331,6 +371,14 @@ bool motors_on_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &re
 
 bool motors_off_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
     motor_state = false;
+    return true;
+}
+bool follow_line_on_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
+    follow_line = 1;
+    return true;
+}
+bool follow_line_off_call(std_srvs::Empty::Request &req, std_srvs::Empty::Response &res) {
+    follow_line = 0;
     return true;
 }
 bool KS_rotate_call(robot::coordinate_sys_rotate::Request &req,
@@ -376,6 +424,8 @@ int main(int argc, char** argv) {
 
 	motors_on = nh.advertiseService("/motors_on", motors_on_call);
 	motors_off = nh.advertiseService("/motors_off", motors_off_call);
+	follow_line_on = nh.advertiseService("/follow_line_on", follow_line_on_call);
+	follow_line_off = nh.advertiseService("/follow_line_off", follow_line_off_call);
 	KS_rotate = nh.advertiseService("/KS_rotate", KS_rotate_call);
 
 	if (use_motors == 1)	{
@@ -403,8 +453,8 @@ int main(int argc, char** argv) {
 		rc_mpu_config_t MPU_conf = rc_mpu_default_config();
 		MPU_conf.dmp_fetch_accel_gyro = 1;
 		MPU_conf.enable_magnetometer = 1;
-		MPU_conf.compass_time_constant = 25.;
-		MPU_conf.dmp_sample_rate = 200;
+		//MPU_conf.compass_time_constant = 25.;
+		//MPU_conf.dmp_sample_rate = 200;
 		if(rc_mpu_initialize_dmp(&robot_OBJ.MPU_data, MPU_conf) == -1)	{
 			ROS_ERROR_STREAM("MPU initialization unsucessfull");
 		}
@@ -432,9 +482,20 @@ int main(int argc, char** argv) {
 	goal.target[1] = 0.;
 	//ac.sendGoal(goal, &doneCB, &activeCB, &feedbackCB);
 
+	// Create action client
+	
+	actionlib::SimpleActionClient<robot::FollowLineAction> ac_fl("robot_FollowLine_node");
+	ROS_INFO("Waiting for action server to start.");
+	ac_fl.waitForServer();
+	ROS_INFO("Action server started");
+	robot::FollowLineGoal goal_fl;
+	//goal_fl.speed = 250.;
+	//goal_fl.target_square[0] = 10;
+	//goal_fl.target_square[1] = 10;
+	//ac_fl.sendGoal(goal_fl, &FollowLineDoneCB, &FollowLineActiveCB, &FollowLineFeedbackCB);
 
 
-	ros::Rate loop_rate(200);
+	ros::Rate loop_rate(50);
 	
   	robot_OBJ.current_time = ros::Time::now();
   	robot_OBJ.last_time = ros::Time::now();
@@ -445,7 +506,19 @@ int main(int argc, char** argv) {
 		robot_OBJ.last_time = robot_OBJ.current_time;
 		robot_OBJ.current_time = ros::Time::now();
 
-		
+		if(follow_line == 1) {
+			goal_fl.speed = 150.;
+			goal_fl.target_square[0] = 10;
+			goal_fl.target_square[1] = 10;
+			ac_fl.sendGoal(goal_fl, &FollowLineDoneCB, &FollowLineActiveCB, &FollowLineFeedbackCB);
+			follow_line = 2;
+		}
+		else if (follow_line == 0) {
+			ac_fl.cancelAllGoals();
+			follow_line = 2;
+		}
+
+
 		if (use_motors) {
 			double motor_power[4] = {0,0,0,0};	//Based on v_x,v_y,a_z set power for each motor
 
@@ -462,6 +535,9 @@ int main(int argc, char** argv) {
 					if(m > 0.6 || m<-0.6) {
 						m = 0.;
 						ROS_INFO("wheel %d, power EXCEED", i);
+						ROS_INFO("motor_power: %f", motor_power[i]);
+						ROS_INFO("robot_vel x: %f", robot_OBJ.robot_vel.actual_v[0]);
+						ROS_INFO("robot_vel y: %f", robot_OBJ.robot_vel.actual_v[1]);
 					}
 					rc_motor_set(i+1, -m);
 				}

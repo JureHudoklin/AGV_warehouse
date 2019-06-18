@@ -4,10 +4,51 @@
 #include <std_msgs/Float64.h>
 #include <std_msgs/Int32.h>
 #include <geometry_msgs/Twist.h>
+#include <robot/Line_sensor.h>
 #include <math.h>
+
 
 #include <actionlib/server/simple_action_server.h>
 #include <robot/FollowLineAction.h>
+
+#define DISTANCE_BETWEEN_SENSORS 9
+#define K_SIDE 4
+#define K_ROTATE 0.045
+
+template <class T>
+int getMinIndex(T* number, int size) {
+
+    int index = 0;
+    T a = number[0];
+    for(int i = 1; i<size; i++) {
+        //ROS_INFO("%f",number[i]);
+        if (number[i]<a) {
+            a = number[i];
+            index = i;
+        }
+    }
+    return index;
+}
+
+
+template <class T>
+T getSign(T number) {
+    if (number < 0) {
+        return -1;
+    } else {
+        return 1;
+    }
+}
+
+template <class T>
+T limitNumber(T number, T max) {
+    if (number < max) {
+        return number;
+    } else {
+        return max;
+    }
+}
+
 
 
 class FollowLineAction {
@@ -37,7 +78,7 @@ public:
             
         }
         target_speed =  goal->speed;
-        ROS_INFO("Moving robot to square: %d, %d", target_square[0], target_square[1]);
+        ROS_INFO("Moving robot to square: %d, %d", target[0], target[1]);
     }
 
     void preemptCB() {
@@ -62,17 +103,38 @@ public:
             return;
         }
 
-        // Write recived data to robot_position
+        // Calculate line postion
+        double* line_position;
+        double fr_sen[8];
+        double ba_sen[8];
+        //ROS_INFO("test");
+        //ROS_INFO("%f,  %f", msg->front_sensors[0], fr_sen[0]);
+        for(int i = 0; i<8; i++) {
+            fr_sen[i] = msg->front_sensors[i];
+            //ROS_INFO("%f,  %f", msg->front_sensors[i], fr_sen[i]);
+            ba_sen[i] = msg->back_sensors[i];
+        }
+        line_position = calculateLinePosition(fr_sen, ba_sen);
+        
+        ROS_INFO("pozicija_crte: front-> %f, back-> %f", line_position[0], line_position[1]);
+
+        geometry_msgs::Twist twist;
         
         
-        as_.setSucceeded(result_);
+        twist.linear.x = target_speed; //getSign<double>(target_speed) * (abs(target_speed) - abs(line_position[0]) - abs(line_position[1]));
+        twist.linear.y = limitNumber<double>(-(line_position[0] + line_position[1])*K_SIDE, 300.);
+        twist.angular.z = limitNumber<double>(-(line_position[0] - line_position[1])*K_ROTATE, 5.);
 
-
+        cmd_vel_pub_.publish(twist);
+        
+        delete[] line_position;
+        //as_.setSucceeded(result_);
     }
 protected:
     // Vars
     int target[2];
-    double target_speed;  
+    double target_speed;
+
 
     // Msgs
     robot::FollowLineFeedback feedback_;
@@ -88,6 +150,25 @@ protected:
     ros::NodeHandle nh_;
     actionlib::SimpleActionServer<robot::FollowLineAction> as_;
     std::string action_name_;
+
+    double* calculateLinePosition(double* front_sen, double* back_sen) {
+        double* line_pos = new double[2];
+
+        int f = getMinIndex<double>(front_sen+1, 6)+1;
+        int b = getMinIndex<double>(back_sen+1, 6)+1;
+
+        ROS_INFO("f. %d, b: %d", f,b);
+        double f_v, b_v;
+
+        f_v = (f-3.5) - (0.57-0.33*front_sen[f-1]) + (0.57-0.33*front_sen[f+1]);    
+        b_v = (b-3.5) - (0.57-0.33*back_sen[b-1]) + (0.57-0.33*back_sen[b+1]);
+
+        line_pos[0] = DISTANCE_BETWEEN_SENSORS * f_v;
+
+        line_pos[1] = DISTANCE_BETWEEN_SENSORS * b_v;
+
+        return line_pos;
+    }
 };
 
 

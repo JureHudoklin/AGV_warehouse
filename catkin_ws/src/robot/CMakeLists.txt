@@ -71,7 +71,7 @@ add_service_files(
 add_action_files(
   FILES
   MoveRobot.action
-#   Action2.action
+  FollowLine.action
 )
 
 ## Generate added messages and services with any dependencies listed here
@@ -146,6 +146,7 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node src/robot_cpp.cpp )
 add_executable(${PROJECT_NAME}_MoveRobot_node src/MoveRobot_cpp.cpp)
+add_executable(${PROJECT_NAME}_FollowLine_node src/FollowLine_cpp.cpp)
 add_executable(${PROJECT_NAME}_sensors_node src/sensors_cpp.cpp)
 
 
@@ -163,6 +164,9 @@ add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catk
 add_dependencies(${PROJECT_NAME}_MoveRobot_node ${PROJECT_NAME}_gencfg)
 add_dependencies(${PROJECT_NAME}_MoveRobot_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+add_dependencies(${PROJECT_NAME}_FollowLine_node ${PROJECT_NAME}_gencfg)
+add_dependencies(${PROJECT_NAME}_FollowLine_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
 add_dependencies(${PROJECT_NAME}_sensors_node ${PROJECT_NAME}_gencfg)
 add_dependencies(${PROJECT_NAME}_sensors_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
@@ -173,6 +177,11 @@ target_link_libraries(${PROJECT_NAME}_node
 )
 
 target_link_libraries(${PROJECT_NAME}_MoveRobot_node
+  ${catkin_LIBRARIES}
+  librobotcontrol.so
+)
+
+target_link_libraries(${PROJECT_NAME}_FollowLine_node
   ${catkin_LIBRARIES}
   librobotcontrol.so
 )
