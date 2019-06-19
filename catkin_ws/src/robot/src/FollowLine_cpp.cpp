@@ -172,8 +172,8 @@ protected:
         ROS_INFO("f. %d, b: %d", f,b);
         double f_v, b_v;
 
-        f_v = (f-3.5) - (0.57-0.33*front_sen[f-1]) + (0.57-0.33*front_sen[f+1]);    
-        b_v = (b-3.5) - (0.57-0.33*back_sen[b-1]) + (0.57-0.33*back_sen[b+1]);
+        f_v = (f-3.5) + 0.33*(front_sen[f-1] - front_sen[f+1]);    
+        b_v = (b-3.5) + 0.33*(back_sen[f-1] - back_sen[f+1]));
 
         line_pos[0] = DISTANCE_BETWEEN_SENSORS * f_v;
 

@@ -178,7 +178,7 @@ void Robot::calc_velocities(Robot_enc_val &old_val) {
 	
 	/*
 	Robot velocities are calculated from wheel velocities. As the system of eqations is overdefined,
-	Three pairs of three wheels are used and  velocities from those calculations are averaged.
+	method of least squares is used.
 	*/
 	double pinv_koef = 0.35355339;
 	robot_vel.actual_v[0] = pinv_koef * (-wheel_vel[0] - wheel_vel[1] + wheel_vel[2] + wheel_vel[3]);
@@ -199,15 +199,17 @@ void Robot::weigh_velocities(double(& weighted_velocities)[3]) {
 	double dt = current_time.toSec()-last_time.toSec();
 
 	for(int i = 0; i<3; i++) {
-		double error, du;
+		double error;
 		double P_, I_, D_;
-		du = 0;
+
+		// Calculation of current error
 		error = robot_vel.target_v[i] - robot_vel.actual_v[i];
 
+		// Proportional part
 		P_ = PID.P * error;
+
+		// Integral part with, integrator windup safety
 		PID_StateHistory.u[i] += error*dt; 
-		//ROS_INFO("error %f, error*dt %f", error, error*dt);
-		//ROS_INFO("PID_StateHistory %f", PID_StateHistory.u[i]);
 		
 		if (PID_StateHistory.u[i]>200.) {
 			ROS_INFO("Integrator windup warning");
@@ -217,7 +219,6 @@ void Robot::weigh_velocities(double(& weighted_velocities)[3]) {
 			PID_StateHistory.u[i] = -200;
 		}
 		
-
 		if (PID_StateHistory.u[2]>10.) {
 			ROS_INFO("Integrator windup warning");
 			PID_StateHistory.u[2] = 10.;
@@ -226,14 +227,15 @@ void Robot::weigh_velocities(double(& weighted_velocities)[3]) {
 			PID_StateHistory.u[2] = -10.;
 		}
 
-
 		I_ = PID.I * PID_StateHistory.u[i];
 		
+		// Diferential part
 		D_ = PID.D *(error-PID_StateHistory.error_1[i]);
 
-
+		// Sum of all parts
 		weighted_velocities[i] = P_ + I_ + D_;
 
+		// If output is to high signal error and set reference velocity and output to 0
 		if (weighted_velocities[i] > 1200) {
 			for (int i = 0; i<3; i++) {
 				PID_StateHistory.u[i] = 0;
@@ -247,6 +249,7 @@ void Robot::weigh_velocities(double(& weighted_velocities)[3]) {
 			return;
 		}
 	
+		// Update old error
 		PID_StateHistory.error_1[i] = error;
 		
 	}
