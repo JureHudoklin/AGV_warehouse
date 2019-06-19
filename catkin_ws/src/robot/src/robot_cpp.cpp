@@ -538,20 +538,17 @@ int main(int argc, char** argv) {
 
 			//Calculater move change in x,y coordina. Angle is set based on gyro.
 			robot_OBJ.vel_pose.a_z = robot_OBJ.MPU_data.fused_TaitBryan[2];
-			ROS_INFO("angl vel %f", robot_OBJ.vel_pose.a_z);
-
 			
 			double dh = robot_OBJ.vel_pose.a_z - robot_OBJ.coordinate_ofset;
 			
 			double delta_x = (robot_OBJ.robot_vel.actual_v[0]*cos(dh) - robot_OBJ.robot_vel.actual_v[1]*sin(dh))*dt;
-			double delta_y = (-robot_OBJ.robot_vel.actual_v[0]*sin(dh) + robot_OBJ.robot_vel.actual_v[1]*cos(dh))*dt;
+			double delta_y = (robot_OBJ.robot_vel.actual_v[0]*sin(dh) + robot_OBJ.robot_vel.actual_v[1]*cos(dh))*dt;
 
 			geometry_msgs::Quaternion odom_quat;
 			//Save position changes to robot object
 			robot_OBJ.vel_pose.x += delta_x;
 			robot_OBJ.vel_pose.y += delta_y;
 
-			
 			
 			//Create quaternion from gyro + ofset for robot
 			odom_quat = tf::createQuaternionMsgFromYaw(dh);

@@ -133,7 +133,7 @@ public:
         
         twist.linear.x = target_speed; //getSign<double>(target_speed) * (abs(target_speed) - abs(line_position[0]) - abs(line_position[1]));
         twist.linear.y = limitNumber<double>(error*P_SIDE + (error - error_old) * D_SIDE, 300.);
-        twist.angular.z = limitNumber<double>(-(line_position[0] - line_position[1])*P_ROTATE, 4.);
+        twist.angular.z = limitNumber<double>((line_position[0] - line_position[1])*P_ROTATE, 4.);
 
         cmd_vel_pub_.publish(twist);
         
@@ -172,8 +172,11 @@ protected:
         ROS_INFO("f. %d, b: %d", f,b);
         double f_v, b_v;
 
-        f_v = (f-3.5) + 0.33*(front_sen[f-1] - front_sen[f+1]);    
-        b_v = (b-3.5) + 0.33*(back_sen[f-1] - back_sen[f+1]));
+
+        //f_v = (f-3.5) - (0.57-0.33*front_sen[f-1]) + (0.57-0.33*front_sen[f+1]);
+
+        f_v = -(f-3.5) - 0.33*(front_sen[f-1] - front_sen[f+1]);    
+        b_v = -(b-3.5) - 0.33*(back_sen[b-1] - back_sen[b+1]);
 
         line_pos[0] = DISTANCE_BETWEEN_SENSORS * f_v;
 

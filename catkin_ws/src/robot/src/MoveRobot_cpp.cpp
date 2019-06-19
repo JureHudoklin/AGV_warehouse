@@ -22,10 +22,12 @@ T getSign(T number) {
 
 template <class T>
 T limitNumber(T number, T max) {
-    if (number < max) {
-        return number;
-    } else {
+    if (number > max) {
         return max;
+    } else if (number < -max) {
+        return -max;
+    } else {
+        return number;
     }
 }
 
@@ -91,8 +93,6 @@ public:
         robot_position[2] = yaw;
         //ROS_INFO(" %f, %f, %f", robot_position[0], robot_position[1], robot_position[2]);
 
-        get_distance();
-
         double gl_vel[3];
         glob_velocity(gl_vel);
         //ROS_INFO("global vel:  %f, %f", gl_vel[0], gl_vel[1]);
@@ -140,22 +140,15 @@ protected:
     actionlib::SimpleActionServer<robot::MoveRobotAction> as_;
     std::string action_name_;
 
-    void get_distance(void) {
-        double sum = 0;
-        for(int i = 0; i < 2; i++) {
-            sum += pow(robot_position[i] - target_position[i], 2);
-        }
-        distance = sqrt(sum);
-    }
-
     void glob_velocity(double *global_vel) {
         double ZERO_FACTOR = 100.;
-        double P_koef = 1.;
+        double P_koef = 0.5;
 
         // Velocity for each direction is calculated seperately
         for(int i = 0; i < 3; i++) {
             double dist;
 
+            ROS_INFO(" dist %f", robot_position[i]);
             // Calculate distance to target
             dist = (target_position[i] - robot_position[i]);
 
@@ -163,7 +156,7 @@ protected:
             if (i < 2) {
 
                 // When robot is within 50mm of target position we stop moving.
-                if (abs(dist) > 10) {
+                if (abs(dist) > 8) {
                     double sign, velocity;
                     sign = getSign<double>(dist);                           // Get sign of distance
                     velocity = ZERO_FACTOR + P_koef*abs(dist);              // Calculate velocity
@@ -176,12 +169,16 @@ protected:
 
             // Similar method for angular velocities -> different coeficients
             } else {
-                if (abs(dist) > 0.05) {
+                if (abs(dist) > 0.03) {
                     double sign, velocity;
+                    ROS_INFO(" dist %f", dist);
+                    if(abs(dist)>M_PI) {
+                        dist = dist - 2*M_PI;
+                    }
                     sign = getSign<double>(dist);
-                    velocity = M_PI/8. + P_koef*abs(dist);
+                    velocity = sign*0.3 + P_koef*dist;
                     velocity = limitNumber<float>(velocity, M_PI_2);
-                    global_vel[i] = sign*velocity;
+                    global_vel[i] = velocity;
                 } else {
                     global_vel[i] = 0;
                 }
@@ -198,11 +195,13 @@ protected:
                 global_vel[3] -> "Required velocities in GCS"
                 loc_vel -> "array where the calculates velocities in LCS will be stored"
         */
+       /*
         if (global_vel[2] != 0) {
             angle = angle -getSign<double>(global_vel[2])*0.2;
         }
-        loc_vel.velocity[0] = cos(angle)* global_vel[0] - sin(angle)* global_vel[1];
-        loc_vel.velocity[1] = -sin(angle)* global_vel[0] + cos(angle)* global_vel[1];
+        */
+        loc_vel.velocity[0] = cos(angle)* global_vel[0] + sin(angle) * global_vel[1];
+        loc_vel.velocity[1] = - sin(angle)* global_vel[0] + cos(angle)* global_vel[1];
         loc_vel.velocity[2] = global_vel[2];
     }
 
