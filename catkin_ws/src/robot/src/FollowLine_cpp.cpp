@@ -7,6 +7,8 @@
 #include <robot/Line_sensor.h>
 #include <math.h>
 
+#include <dynamic_reconfigure/server.h>
+#include <robot/ReconfigureLineConfig.h>
 
 #include <actionlib/server/simple_action_server.h>
 #include <robot/FollowLineAction.h>
@@ -49,7 +51,9 @@ T limitNumber(T number, T max) {
     }
 }
 
-
+double P_SIDE;
+double D_SIDE;
+double P_ROTATE;
 
 class FollowLineAction {
 public:
@@ -118,23 +122,31 @@ public:
         
         ROS_INFO("pozicija_crte: front-> %f, back-> %f", line_position[0], line_position[1]);
 
+
+
         geometry_msgs::Twist twist;
+        double error;
+        error = line_position[0] + line_position[1];
+
+
         
         
         twist.linear.x = target_speed; //getSign<double>(target_speed) * (abs(target_speed) - abs(line_position[0]) - abs(line_position[1]));
-        twist.linear.y = limitNumber<double>(-(line_position[0] + line_position[1])*K_SIDE, 300.);
-        twist.angular.z = limitNumber<double>(-(line_position[0] - line_position[1])*K_ROTATE, 5.);
+        twist.linear.y = limitNumber<double>(error*P_SIDE + (error - error_old) * D_SIDE, 300.);
+        twist.angular.z = limitNumber<double>(-(line_position[0] - line_position[1])*P_ROTATE, 4.);
 
         cmd_vel_pub_.publish(twist);
         
         delete[] line_position;
         //as_.setSucceeded(result_);
     }
+
+    
 protected:
     // Vars
     int target[2];
+    double error_old = 0;
     double target_speed;
-
 
     // Msgs
     robot::FollowLineFeedback feedback_;
@@ -172,14 +184,23 @@ protected:
 };
 
 
-
-
-
+void reconfigure_callback(robot::ReconfigureLineConfig &config, uint32_t level) {
+    P_SIDE = config.P_koef;
+    D_SIDE = config.D_koef;
+    P_ROTATE = config.P_rotate_koef;
+	return;
+}
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "robot_FollowLine_node");
 
     FollowLineAction followline(ros::this_node::getName());
+
+    // Set dynamic reconfigure
+	dynamic_reconfigure::Server<robot::ReconfigureLineConfig> server;
+	dynamic_reconfigure::Server<robot::ReconfigureLineConfig>::CallbackType rec_f;
+	rec_f = boost::bind(&reconfigure_callback, _1, _2);
+	server.setCallback(rec_f);   
 
     ros::spin();
 
