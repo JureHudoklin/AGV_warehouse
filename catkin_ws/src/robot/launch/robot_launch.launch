@@ -3,13 +3,12 @@
 	<node pkg="robot" type="robot_node" name="robot_node" output ="screen">
 		<param name="use_imu" value="0" />
 		<param name="use_motors" value="1" />
-		<param name="use_TOF" value="0" />
 		<param name="use_MPU" value="1" />
 	</node>
 
 	<node pkg="robot" type="robot_sensors_node" name="robot_sensors_node" output ="screen">
 	<param name="use_line" value="1" />
-	<param name="use_TOF" value="0" />
+	<param name="use_TOF" value="1" />
 	</node>
 	
 	<node pkg="robot" type="robot_MoveRobot_node" name="robot_MoveRobot_node" output ="screen">

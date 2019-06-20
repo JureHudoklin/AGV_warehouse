@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <robotcontrol.h>
+#include "vl53l0x.h"
 
 //Messages
 #include <std_msgs/Int32.h>
@@ -37,10 +38,15 @@
 #define GP1_2 3, 1
 #define GP1_1 3, 2
 
+
 //Publishers
 ros::Publisher line_sen_pub; // topic = line_sen
+ros::Publisher tof_pub;
+
 int use_line;
 int use_TOF;
+
+VL53L0X vl53l0x;
 
 int main(int argc, char** argv) {
 
@@ -54,6 +60,12 @@ int main(int argc, char** argv) {
 
     ROS_INFO("Starting robot_sensors");
 
+    if (rc_enable_signal_handler() == -1)
+    {
+        ROS_ERROR_STREAM("failed to start signal handler");
+        return -1;
+    }
+
     if (use_line) {
 		ROS_INFO("Initializing line senzors");
         rc_adc_init();
@@ -64,9 +76,23 @@ int main(int argc, char** argv) {
 
         line_sen_pub = nh.advertise<robot::Line_sensor>("/line_sen", 1);
     }
-    if (use_TOF) {
-        ROS_INFO("Initializing TOF sensor");
+    // ToF init
+    if (use_TOF)
+    {
+        ROS_INFO_STREAM("Initializing ToF...");
+        tof_pub = nh.advertise<sensor_msgs::Range>("tof/range", 10);
+        if (vl53l0x.init())
+        {
+            ROS_INFO_STREAM("ToF initialized");
+            vl53l0x.startContinuous();
+        }
+        else
+        {
+            ROS_ERROR_STREAM("failed to initialize IMU");
+            return -1;
+        }
     }
+       
 
     //Set time variables and ros loop rate
     ros::Time current_time, last_time;
@@ -121,9 +147,18 @@ int main(int argc, char** argv) {
 			line_sen_pub.publish(line_sen_msg);			
         }
 
-        if (use_TOF) {
-
-	    }
+        if (use_TOF)
+        {
+            // ToF
+            sensor_msgs::Range tof_msg;
+            tof_msg.header.stamp = current_time;
+            tof_msg.header.frame_id = "tof";
+            tof_msg.field_of_view = 25.0 * M_PI / 180.0; // 25 degrees acc. to datasheet
+            tof_msg.min_range = 0.0;
+            tof_msg.max_range = 1.0;
+            tof_msg.range = vl53l0x.readRangeContinuousMillimeters() / 1000.0;
+            tof_pub.publish(tof_msg);
+        }
 
 		ros::spinOnce();    //On spin it checks messages
 		loop_rate.sleep();
@@ -139,8 +174,9 @@ int main(int argc, char** argv) {
         rc_gpio_cleanup(GP0_3);
         rc_gpio_cleanup(GP0_4);
 	}
-    if (use_TOF) {
-
-	}
+    if (use_TOF)
+    {
+        vl53l0x.stopContinuous();
+    }
 	return 0;
 }

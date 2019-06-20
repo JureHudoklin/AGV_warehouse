@@ -125,7 +125,7 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -147,7 +147,7 @@ include_directories(
 add_executable(${PROJECT_NAME}_node src/robot_cpp.cpp )
 add_executable(${PROJECT_NAME}_MoveRobot_node src/MoveRobot_cpp.cpp)
 add_executable(${PROJECT_NAME}_FollowLine_node src/FollowLine_cpp.cpp)
-add_executable(${PROJECT_NAME}_sensors_node src/sensors_cpp.cpp)
+add_executable(${PROJECT_NAME}_sensors_node src/sensors_cpp.cpp src/vl53l0x.cpp)
 
 
 ## Rename C++ executable without prefix
