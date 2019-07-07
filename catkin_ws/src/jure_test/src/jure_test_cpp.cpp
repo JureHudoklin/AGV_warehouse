@@ -7,6 +7,7 @@
 
 // export ROS_MASTER_URI=http://192.168.7.1:11311 on BBB 192.168.43.179
 // export ROS_IP=192.168.7.2 on BBB
+// rosrun tf static_transform_publisher 0 0 0 0 0 0 1 map my_frame 10
 
 //GPIO setup
 #define GP0_1 3, 17 //LED_S

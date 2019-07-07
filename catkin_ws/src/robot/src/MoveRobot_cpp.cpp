@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include "robot.h"
 
 // MESSAGES
 #include <std_msgs/Float64.h>
@@ -11,25 +12,6 @@
 #include <actionlib/server/simple_action_server.h>
 #include <robot/MoveRobotAction.h>
 
-template <class T>
-T getSign(T number) {
-    if (number < 0) {
-        return -1;
-    } else {
-        return 1;
-    }
-}
-
-template <class T>
-T limitNumber(T number, T max) {
-    if (number > max) {
-        return max;
-    } else if (number < -max) {
-        return -max;
-    } else {
-        return number;
-    }
-}
 
 class MoveRobotAction {
 public:
@@ -91,14 +73,13 @@ public:
         tf::Matrix3x3 m(q);
         m.getRPY(roll, pitch, yaw);
         robot_position[2] = yaw;
-        //ROS_INFO(" %f, %f, %f", robot_position[0], robot_position[1], robot_position[2]);
 
         double gl_vel[3];
         glob_velocity(gl_vel);
-        //ROS_INFO("global vel:  %f, %f", gl_vel[0], gl_vel[1]);
+        
         rotate_velocities(robot_position[2], gl_vel, feedback_);
 
-        //ROS_INFO("local vel:  %f, %f", feedback_.velocity[0], feedback_.velocity[1]);
+        
         vel_feedback_.linear.x = feedback_.velocity[0];
         vel_feedback_.linear.y = feedback_.velocity[1];
         vel_feedback_.angular.z = feedback_.velocity[2];
@@ -148,7 +129,7 @@ protected:
         for(int i = 0; i < 3; i++) {
             double dist;
 
-            ROS_INFO(" dist %f", robot_position[i]);
+            
             // Calculate distance to target
             dist = (target_position[i] - robot_position[i]);
 
@@ -171,10 +152,10 @@ protected:
             } else {
                 if (abs(dist) > 0.03) {
                     double sign, velocity;
-                    ROS_INFO(" dist %f", dist);
                     if(abs(dist)>M_PI) {
                         dist = dist - 2*M_PI;
                     }
+                    
                     sign = getSign<double>(dist);
                     velocity = sign*0.3 + P_koef*dist;
                     velocity = limitNumber<float>(velocity, M_PI_2);

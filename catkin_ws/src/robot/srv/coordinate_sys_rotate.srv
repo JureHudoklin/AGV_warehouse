@@ -1,3 +1,4 @@
-float64 KS_ofset
+float64 KS_offset
+float64[2] position
 ---
 int64 success

@@ -1,9 +1,11 @@
 #include <ros/ros.h>
+#include "robot.h"
 
 // MESSAGES
 #include <std_msgs/Float64.h>
 #include <std_msgs/Int32.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/PolygonStamped.h>
 #include <robot/Line_sensor.h>
 #include <math.h>
 
@@ -13,47 +15,15 @@
 #include <actionlib/server/simple_action_server.h>
 #include <robot/FollowLineAction.h>
 
-#define DISTANCE_BETWEEN_SENSORS 9
 #define K_SIDE 4
 #define K_ROTATE 0.045
 
-template <class T>
-int getMinIndex(T* number, int size) {
 
-    int index = 0;
-    T a = number[0];
-    for(int i = 1; i<size; i++) {
-        //ROS_INFO("%f",number[i]);
-        if (number[i]<a) {
-            a = number[i];
-            index = i;
-        }
-    }
-    return index;
-}
-
-
-template <class T>
-T getSign(T number) {
-    if (number < 0) {
-        return -1;
-    } else {
-        return 1;
-    }
-}
-
-template <class T>
-T limitNumber(T number, T max) {
-    if (number < max) {
-        return number;
-    } else {
-        return max;
-    }
-}
 
 double P_SIDE;
 double D_SIDE;
 double P_ROTATE;
+double D_ROTATE;
 
 class FollowLineAction {
 public:
@@ -67,7 +37,7 @@ public:
         as_.registerPreemptCallback(boost::bind(&FollowLineAction::preemptCB, this));
         
         // Define topics to subscribe to
-        line_sen_sub_ = nh_.subscribe("/line_sen", 1, &FollowLineAction::controlCB, this);
+        line_sen_pos_sub_ = nh_.subscribe("/line_pos", 1, &FollowLineAction::controlCB, this);
         cmd_vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/cmd_vel", 10);
         as_.start();
     }
@@ -99,7 +69,7 @@ public:
         as_.setPreempted();
     }
 
-    void controlCB(const robot::Line_sensor::ConstPtr msg)
+    void controlCB(const geometry_msgs::PolygonStamped::ConstPtr msg)
     {
         // First check that action is still active
         if (!as_.isActive())
@@ -107,37 +77,21 @@ public:
             return;
         }
 
-        // Calculate line postion
-        double* line_position;
-        double fr_sen[8];
-        double ba_sen[8];
-        //ROS_INFO("test");
-        //ROS_INFO("%f,  %f", msg->front_sensors[0], fr_sen[0]);
-        for(int i = 0; i<8; i++) {
-            fr_sen[i] = msg->front_sensors[i];
-            //ROS_INFO("%f,  %f", msg->front_sensors[i], fr_sen[i]);
-            ba_sen[i] = msg->back_sensors[i];
-        }
-        line_position = calculateLinePosition(fr_sen, ba_sen);
-        
-        ROS_INFO("pozicija_crte: front-> %f, back-> %f", line_position[0], line_position[1]);
-
-
-
         geometry_msgs::Twist twist;
-        double error;
-        error = line_position[0] + line_position[1];
+        double error_side, error_rotate;
 
-
-        
+        // Multiplying by 1000 is done to transform to mmilimeters. If everything is changed to meters this can be removed
+        error_side = msg->polygon.points[0].y*1000 +  msg->polygon.points[3].y*1000;
+        error_rotate = msg->polygon.points[0].y*1000 - msg->polygon.points[3].y*1000;
         
         twist.linear.x = target_speed; //getSign<double>(target_speed) * (abs(target_speed) - abs(line_position[0]) - abs(line_position[1]));
-        twist.linear.y = limitNumber<double>(error*P_SIDE + (error - error_old) * D_SIDE, 300.);
-        twist.angular.z = limitNumber<double>((line_position[0] - line_position[1])*P_ROTATE, 4.);
+        twist.linear.y = limitNumber<double>(error_side*P_SIDE + (error_side - error_side_old) * D_SIDE, 300.);
+        twist.angular.z = limitNumber<double>(error_rotate*P_ROTATE + (error_rotate- error_rotate_old) * D_ROTATE, 4.);
 
         cmd_vel_pub_.publish(twist);
-        
-        delete[] line_position;
+        error_side_old = error_side;
+        error_rotate_old = error_rotate;
+
         //as_.setSucceeded(result_);
     }
 
@@ -145,7 +99,8 @@ public:
 protected:
     // Vars
     int target[2];
-    double error_old = 0;
+    double error_side_old = 0;
+    double error_rotate_old = 0;
     double target_speed;
 
     // Msgs
@@ -153,7 +108,7 @@ protected:
     robot::FollowLineResult result_;
 
     // Subs
-    ros::Subscriber line_sen_sub_;
+    ros::Subscriber line_sen_pos_sub_;
 
     //Pub
     ros::Publisher cmd_vel_pub_;
@@ -163,27 +118,6 @@ protected:
     actionlib::SimpleActionServer<robot::FollowLineAction> as_;
     std::string action_name_;
 
-    double* calculateLinePosition(double* front_sen, double* back_sen) {
-        double* line_pos = new double[2];
-
-        int f = getMinIndex<double>(front_sen+1, 6)+1;
-        int b = getMinIndex<double>(back_sen+1, 6)+1;
-
-        ROS_INFO("f. %d, b: %d", f,b);
-        double f_v, b_v;
-
-
-        //f_v = (f-3.5) - (0.57-0.33*front_sen[f-1]) + (0.57-0.33*front_sen[f+1]);
-
-        f_v = -(f-3.5) - 0.33*(front_sen[f-1] - front_sen[f+1]);    
-        b_v = -(b-3.5) - 0.33*(back_sen[b-1] - back_sen[b+1]);
-
-        line_pos[0] = DISTANCE_BETWEEN_SENSORS * f_v;
-
-        line_pos[1] = DISTANCE_BETWEEN_SENSORS * b_v;
-
-        return line_pos;
-    }
 };
 
 
@@ -191,6 +125,7 @@ void reconfigure_callback(robot::ReconfigureLineConfig &config, uint32_t level) 
     P_SIDE = config.P_koef;
     D_SIDE = config.D_koef;
     P_ROTATE = config.P_rotate_koef;
+    D_ROTATE = config.D_rotate_koef;
 	return;
 }
 
